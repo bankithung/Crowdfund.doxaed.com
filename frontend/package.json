@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "gsap": "^3.15.0",
     "motion": "^12.42.2",
     "ogl": "^1.0.11",
