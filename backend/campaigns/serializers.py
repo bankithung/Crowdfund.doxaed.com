@@ -47,6 +47,74 @@ def days_left(campaign):
     return (campaign.end_date - timezone.localdate()).days
 
 
+def impact_dict(campaign, raised):
+    """Public impact block: how much of the real-world goal ('75,000 kg of
+    cabbage secured') the verified funds translate to."""
+    if not campaign.impact_enabled:
+        return None
+
+    basis = raised
+    if campaign.impact_funds_basis == "eligible":
+        basis = max(0.0, raised - money(campaign.impact_expenses))
+    elif campaign.impact_funds_basis == "percent":
+        basis = raised * campaign.impact_funds_percent / 100.0
+
+    if campaign.impact_mode == "manual":
+        secured = money(campaign.impact_manual_value)
+    else:
+        conv_rupees = money(campaign.impact_conv_rupees)
+        conv_units = money(campaign.impact_conv_units) or 1.0
+        secured = round(basis / conv_rupees * conv_units, 1) if conv_rupees else 0.0
+    if secured == int(secured):
+        secured = int(secured)
+
+    target = money(campaign.impact_target)
+    last_verified = (campaign.donations.filter(status="confirmed")
+                     .exclude(reviewed_at=None)
+                     .order_by("-reviewed_at")
+                     .values_list("reviewed_at", flat=True).first())
+    stamps = [ts for ts in (campaign.impact_updated_at,
+                            last_verified if campaign.impact_mode == "auto" else None)
+              if ts]
+
+    return {
+        "item": campaign.impact_item,
+        "unit": campaign.impact_unit,
+        "action": campaign.impact_action,
+        "target": target,
+        "secured": secured,
+        "progress": min(round((secured / target) * 100, 1) if target else 0.0, 999.0),
+        "mode": campaign.impact_mode,
+        "basis_funds": round(basis, 2),
+        "default_view": campaign.impact_default_view,
+        "completed": ({
+            "action": campaign.impact_completed_action,
+            "qty": money(campaign.impact_completed_qty),
+        } if campaign.impact_completed_enabled else None),
+        "updated_at": max(stamps).isoformat() if stamps else None,
+    }
+
+
+IMPACT_SETTINGS_FIELDS = (
+    "impact_enabled", "impact_item", "impact_unit", "impact_action",
+    "impact_target", "impact_mode", "impact_conv_rupees", "impact_conv_units",
+    "impact_funds_basis", "impact_expenses", "impact_funds_percent",
+    "impact_manual_value", "impact_default_view", "impact_completed_enabled",
+    "impact_completed_action", "impact_completed_qty",
+)
+
+
+def impact_settings_dict(campaign):
+    """Raw impact configuration — the organizer's settings form."""
+    data = {}
+    for field in IMPACT_SETTINGS_FIELDS:
+        value = getattr(campaign, field)
+        if hasattr(value, "quantize"):                    # Decimal → float
+            value = money(value)
+        data[field] = value
+    return data
+
+
 def campaign_dict(campaign, *, private=False):
     data = {
         "id": campaign.pk,
@@ -76,8 +144,10 @@ def campaign_dict(campaign, *, private=False):
         "share_url": share_url(campaign),
         "stats": campaign_counters(campaign),
     }
+    data["impact"] = impact_dict(campaign, data["stats"]["raised"])
     if private:
         data["views"] = campaign.views
+        data["impact_settings"] = impact_settings_dict(campaign)
     return data
 
 

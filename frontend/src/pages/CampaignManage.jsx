@@ -532,6 +532,193 @@ const truncate = (text, n) => (text.length > n ? text.slice(0, n - 1) + '…' : 
 
 /* -------------------------------------------------------------- settings */
 
+/* ------------------------------------------------------ impact settings */
+
+const IMPACT_MODES = [
+  { value: 'auto', label: 'Automatically from verified funds' },
+  { value: 'manual', label: 'Updated manually' },
+]
+const IMPACT_BASES = [
+  { value: 'eligible', label: 'Eligible funds after expenses' },
+  { value: 'all', label: 'All verified funds' },
+  { value: 'percent', label: 'Percentage of verified funds' },
+]
+const IMPACT_VIEWS = [
+  { value: 'funds', label: 'Funds' },
+  { value: 'impact', label: 'Impact' },
+]
+
+/* "₹1,68,075 raised" can also read "12,450 kg secured" — organizers
+   configure what a rupee translates to in the real world. */
+function ImpactSettingsCard({ campaign, onSaved }) {
+  const toast = useToast()
+  const s = campaign.impact_settings
+  const [form, setForm] = useState(() => ({
+    impact_enabled: s.impact_enabled,
+    impact_item: s.impact_item, impact_unit: s.impact_unit,
+    impact_action: s.impact_action,
+    impact_target: s.impact_target ? String(s.impact_target) : '',
+    impact_mode: s.impact_mode,
+    impact_conv_rupees: s.impact_conv_rupees ? String(s.impact_conv_rupees) : '',
+    impact_conv_units: s.impact_conv_units ? String(s.impact_conv_units) : '1',
+    impact_funds_basis: s.impact_funds_basis,
+    impact_expenses: s.impact_expenses ? String(s.impact_expenses) : '',
+    impact_funds_percent: String(s.impact_funds_percent || 100),
+    impact_manual_value: s.impact_manual_value ? String(s.impact_manual_value) : '',
+    impact_default_view: s.impact_default_view,
+    impact_completed_enabled: s.impact_completed_enabled,
+    impact_completed_action: s.impact_completed_action,
+    impact_completed_qty: s.impact_completed_qty ? String(s.impact_completed_qty) : '',
+  }))
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+  const input = (key, extra = {}) => (
+    <input className="input" value={form[key]} {...extra}
+           onChange={(e) => set(key)(e.target.value)} />
+  )
+
+  const save = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setErrors({})
+    const body = new FormData()
+    for (const [key, value] of Object.entries(form)) {
+      if (typeof value === 'boolean') body.append(key, value ? 'true' : 'false')
+      else body.append(key, value)
+    }
+    try {
+      const data = await CampaignApi.update(campaign.id, body)
+      onSaved(data.campaign)
+      toast.success('Impact tracking saved')
+    } catch (err) {
+      setErrors(err.fields || {})
+      if (!err.fields) toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const unit = form.impact_unit || 'units'
+  return (
+    <div className="card">
+      <div className="section-head">
+        <div>
+          <h2 className="block-title">Impact tracking</h2>
+          <p className="section-sub">
+            Show supporters what the money becomes — e.g. “12,450 kg of cabbage secured”.
+          </p>
+        </div>
+      </div>
+      <form onSubmit={save} noValidate>
+        <Check checked={form.impact_enabled} onChange={set('impact_enabled')}>
+          Enable impact tracking
+        </Check>
+
+        {form.impact_enabled && (
+          <div className="impact-fields">
+            <div className="form-row">
+              <Field label="Impact item" required error={errors.impact_item}
+                     hint="What the funds provide.">
+                {input('impact_item', { maxLength: 40, placeholder: 'e.g. Cabbage' })}
+              </Field>
+              <Field label="Unit" required error={errors.impact_unit}>
+                {input('impact_unit', { maxLength: 20, placeholder: 'e.g. kg' })}
+              </Field>
+            </div>
+            <div className="form-row">
+              <Field label="Action word" required error={errors.impact_action}
+                     hint="Reads as “12,450 kg secured”.">
+                {input('impact_action', { maxLength: 30, placeholder: 'e.g. secured' })}
+              </Field>
+              <Field label={`Impact target (${unit})`} required error={errors.impact_target}>
+                {input('impact_target', { inputMode: 'decimal', placeholder: 'e.g. 75000' })}
+              </Field>
+            </div>
+
+            <Field label="How should impact be calculated?" error={errors.impact_mode}>
+              <Select value={form.impact_mode} onChange={set('impact_mode')}
+                      options={IMPACT_MODES} ariaLabel="Impact calculation mode" />
+            </Field>
+
+            {form.impact_mode === 'auto' ? (
+              <>
+                <div className="field">
+                  <span className="field-label">Conversion</span>
+                  <div className="impact-conv">
+                    <span>₹</span>
+                    {input('impact_conv_rupees', { inputMode: 'decimal', placeholder: '13' })}
+                    <span>provides</span>
+                    {input('impact_conv_units', { inputMode: 'decimal', placeholder: '1' })}
+                    <span>{unit}</span>
+                  </div>
+                  {(errors.impact_conv_rupees || errors.impact_conv_units) && (
+                    <span className="field-error">
+                      {errors.impact_conv_rupees || errors.impact_conv_units}
+                    </span>
+                  )}
+                </div>
+                <Field label="Which funds count?" error={errors.impact_funds_basis}>
+                  <Select value={form.impact_funds_basis} onChange={set('impact_funds_basis')}
+                          options={IMPACT_BASES} ariaLabel="Which funds count" />
+                </Field>
+                {form.impact_funds_basis === 'eligible' && (
+                  <Field label="Expenses so far (₹)" error={errors.impact_expenses}
+                         hint="Deducted from verified funds before converting.">
+                    {input('impact_expenses', { inputMode: 'decimal', placeholder: 'e.g. 5000' })}
+                  </Field>
+                )}
+                {form.impact_funds_basis === 'percent' && (
+                  <Field label="Percentage of verified funds (%)"
+                         error={errors.impact_funds_percent}>
+                    {input('impact_funds_percent', { inputMode: 'numeric', placeholder: 'e.g. 80' })}
+                  </Field>
+                )}
+              </>
+            ) : (
+              <Field label={`Current impact value (${unit})`}
+                     error={errors.impact_manual_value}
+                     hint="Update this yourself as the work progresses.">
+                {input('impact_manual_value', { inputMode: 'decimal', placeholder: 'e.g. 12450' })}
+              </Field>
+            )}
+
+            <Field label="Default progress view" error={errors.impact_default_view}
+                   hint="What the public page shows first.">
+              <Select value={form.impact_default_view} onChange={set('impact_default_view')}
+                      options={IMPACT_VIEWS} ariaLabel="Default progress view" />
+            </Field>
+
+            <Check checked={form.impact_completed_enabled}
+                   onChange={set('impact_completed_enabled')}>
+              Add a completed-impact figure (e.g. “8,200 kg delivered”)
+            </Check>
+            {form.impact_completed_enabled && (
+              <div className="form-row">
+                <Field label="Completed action word" error={errors.impact_completed_action}>
+                  {input('impact_completed_action', { maxLength: 30, placeholder: 'e.g. delivered' })}
+                </Field>
+                <Field label={`Current completed quantity (${unit})`}
+                       error={errors.impact_completed_qty}>
+                  {input('impact_completed_qty', { inputMode: 'decimal', placeholder: 'e.g. 8200' })}
+                </Field>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="form-nav">
+          <span />
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? <Spinner size={14} /> : 'Save impact settings'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function SettingsTab({ campaign, onSaved }) {
   const [editing, setEditing] = useState(false)
   if (editing) {
@@ -641,6 +828,9 @@ function SettingsSummary({ campaign, onEdit, onSaved }) {
       </div>
 
       <GalleryCard campaign={campaign} onSaved={onSaved} />
+
+      <ImpactSettingsCard key={`impact-${campaign.id}`} campaign={campaign}
+                          onSaved={onSaved} />
 
       <div className="card">
         <div className="section-head">

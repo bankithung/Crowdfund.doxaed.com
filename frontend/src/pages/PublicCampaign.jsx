@@ -36,6 +36,7 @@ export default function PublicCampaign() {
   const [notFound, setNotFound] = useState(false)
   const [claimOpen, setClaimOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(!!params.get('ref'))
+  const [viewChoice, setViewChoice] = useState(null)   // null → campaign default
 
   const load = useCallback((silent = false) => {
     PublicApi.campaign(slug, { silent })
@@ -87,6 +88,9 @@ export default function PublicCampaign() {
   const goalReached = stats.raised >= stats.goal && stats.goal > 0
   const closed = !campaign.is_open
   const upiId = effectiveUpiId(campaign)
+  const impact = campaign.impact
+  const statsView = impact ? (viewChoice || impact.default_view || 'funds') : 'funds'
+  const fmtQty = (value) => new Intl.NumberFormat('en-IN').format(value)
 
   const copyUpi = async () => {
     try {
@@ -183,36 +187,99 @@ export default function PublicCampaign() {
           <div className="pc-aside-stack">
             {/* raised-so-far card — first on the page, above the story */}
             <div className="card pc-card pc-stats-card">
-              <span className="mini-label">
-                <span className="pc-live-dot" aria-hidden="true" /> Raised so far
-              </span>
-              <div className="pc-amounts">
-                <MoneyCounter value={stats.raised} fontSize={42}
-                              color="var(--money-strong)" background="#ffffff" />
-                <span className="pc-goal">of {inr(stats.goal)} goal</span>
-              </div>
-              <ProgressBar value={stats.progress} />
-              <div className="pc-stats3">
-                <div>
-                  <strong>{stats.donors}</strong>
-                  <span>verified supporter{stats.donors === 1 ? '' : 's'}</span>
+              {impact && (
+                <div className="pc-view-toggle" role="tablist" aria-label="Progress view">
+                  <button role="tab" aria-selected={statsView === 'funds'}
+                          className={statsView === 'funds' ? 'is-active' : ''}
+                          onClick={() => setViewChoice('funds')}>
+                    Funds
+                  </button>
+                  <button role="tab" aria-selected={statsView === 'impact'}
+                          className={statsView === 'impact' ? 'is-active' : ''}
+                          onClick={() => setViewChoice('impact')}>
+                    Impact
+                  </button>
                 </div>
-                <div>
-                  <strong>{Math.min(stats.progress, 999)}%</strong>
-                  <span>funded</span>
-                </div>
-                {campaign.days_left != null && campaign.days_left >= 0 ? (
-                  <div>
-                    <strong>{campaign.days_left}</strong>
-                    <span>day{campaign.days_left === 1 ? '' : 's'} left</span>
+              )}
+
+              {statsView === 'funds' ? (
+                <>
+                  <span className="mini-label">
+                    <span className="pc-live-dot" aria-hidden="true" /> Raised so far
+                  </span>
+                  <div className="pc-amounts">
+                    <MoneyCounter value={stats.raised} fontSize={42}
+                                  color="var(--money-strong)" background="#ffffff" />
+                    <span className="pc-goal">of {inr(stats.goal)} goal</span>
                   </div>
-                ) : (
-                  <div>
-                    <strong><Icon name="refresh" size={15} /></strong>
-                    <span>open-ended</span>
+                  <ProgressBar value={stats.progress} />
+                  <div className="pc-stats3">
+                    <div>
+                      <strong>{stats.donors}</strong>
+                      <span>verified supporter{stats.donors === 1 ? '' : 's'}</span>
+                    </div>
+                    <div>
+                      <strong>{Math.min(stats.progress, 999)}%</strong>
+                      <span>funded</span>
+                    </div>
+                    {campaign.days_left != null && campaign.days_left >= 0 ? (
+                      <div>
+                        <strong>{campaign.days_left}</strong>
+                        <span>day{campaign.days_left === 1 ? '' : 's'} left</span>
+                      </div>
+                    ) : (
+                      <div>
+                        <strong><Icon name="refresh" size={15} /></strong>
+                        <span>open-ended</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  {impact && impact.mode === 'auto' && impact.secured > 0 && (
+                    <p className="pc-impact-equiv muted">
+                      Equivalent to approximately <strong>
+                      {fmtQty(impact.secured)} {impact.unit} {impact.action}</strong>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="mini-label">
+                    <Icon name="target" size={12} />
+                    {impact.item ? `${impact.item} — impact so far` : 'Impact so far'}
+                  </span>
+                  <div className="pc-amounts">
+                    <span className="pc-impact-big">
+                      {fmtQty(impact.secured)} {impact.unit}
+                    </span>
+                    <span className="pc-goal">
+                      {impact.action} of {fmtQty(impact.target)} {impact.unit}
+                    </span>
+                  </div>
+                  <ProgressBar value={impact.progress} />
+                  <div className="pc-stats3">
+                    <div>
+                      <strong>{Math.min(impact.progress, 999)}%</strong>
+                      <span>of impact target</span>
+                    </div>
+                    {impact.completed && (
+                      <div>
+                        <strong>{fmtQty(impact.completed.qty)}</strong>
+                        <span>{impact.unit} {impact.completed.action}</span>
+                      </div>
+                    )}
+                    <div>
+                      <strong>{stats.donors}</strong>
+                      <span>verified supporter{stats.donors === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
+                  <p className="pc-impact-note muted">
+                    {impact.mode === 'auto'
+                      ? <>Based on {inr(impact.basis_funds)} in verified contributions</>
+                      : <>Updated by the organizer</>}
+                    {impact.updated_at && <> · {timeAgo(impact.updated_at)}</>}
+                  </p>
+                </>
+              )}
 
               {!closed && (
                 <div className="pc-cta-stack">

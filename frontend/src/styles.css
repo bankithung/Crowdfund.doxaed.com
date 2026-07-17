@@ -2063,6 +2063,58 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   .pc-marquee { overflow-x: auto; }
 }
 
+/* funds | impact segmented toggle */
+.pc-view-toggle {
+  display: flex;
+  gap: 3px;
+  align-self: stretch;
+  padding: 4px;
+  margin-bottom: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.pc-view-toggle button {
+  flex: 1;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.pc-view-toggle button.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(15, 20, 40, 0.12);
+}
+.pc-impact-big {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--money-strong);
+  line-height: 1.15;
+}
+.pc-impact-equiv,
+.pc-impact-note { font-size: var(--fs-12); }
+.pc-impact-equiv strong { color: var(--money-strong); }
+
+/* impact settings form (manage → settings) */
+.impact-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+.impact-conv { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.impact-conv .input { width: 108px; flex: 0 1 auto; }
+.impact-conv span {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 /* raised-so-far card (stats + Donate / verify CTAs) */
 .pc-stats-card {
   border-top: 3px solid var(--money);

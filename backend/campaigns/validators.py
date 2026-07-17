@@ -111,6 +111,93 @@ def clean_campaign_fields(data, *, partial):
     return cleaned, errors
 
 
+IMPACT_MODES = {"auto", "manual"}
+IMPACT_BASES = {"eligible", "all", "percent"}
+IMPACT_VIEWS = {"funds", "impact"}
+
+
+def clean_impact_fields(data):
+    """Partial validation for the impact-tracking settings — only keys
+    present in `data` are validated/returned. Booleans are handled by the
+    view (as_bool); this covers the typed fields."""
+    cleaned, errors = {}, {}
+
+    def text(key, label, max_len):
+        value = str(data.get(key) or "").strip()
+        if len(value) > max_len:
+            errors[key] = f"{label} must be at most {max_len} characters."
+        else:
+            cleaned[key] = value
+
+    if "impact_item" in data:
+        text("impact_item", "Impact item", 40)
+    if "impact_unit" in data:
+        text("impact_unit", "Unit", 20)
+    if "impact_action" in data:
+        text("impact_action", "Action word", 30)
+    if "impact_completed_action" in data:
+        text("impact_completed_action", "Completed action word", 30)
+
+    def amount(key, label, lo, hi, *, allow_empty=False):
+        raw = str(data.get(key) or "").strip()
+        if not raw and allow_empty:
+            cleaned[key] = None
+            return
+        try:
+            cleaned[key] = parse_amount(raw, lo, hi, label)
+        except ValidationError as exc:
+            errors[key] = exc.messages[0]
+
+    if "impact_target" in data:
+        amount("impact_target", "impact target", Decimal("1"), Decimal("1000000000"))
+    if "impact_conv_rupees" in data:
+        amount("impact_conv_rupees", "conversion amount", Decimal("0.01"),
+               Decimal("100000000"))
+    if "impact_conv_units" in data:
+        amount("impact_conv_units", "conversion quantity", Decimal("0.01"),
+               Decimal("100000000"))
+    if "impact_expenses" in data:
+        amount("impact_expenses", "expenses", Decimal("0"), Decimal("1000000000"))
+    if "impact_manual_value" in data:
+        amount("impact_manual_value", "impact value", Decimal("0"),
+               Decimal("1000000000"))
+    if "impact_completed_qty" in data:
+        amount("impact_completed_qty", "completed quantity", Decimal("0"),
+               Decimal("1000000000"))
+
+    if "impact_mode" in data:
+        mode = str(data.get("impact_mode") or "").strip().lower()
+        if mode not in IMPACT_MODES:
+            errors["impact_mode"] = "Choose automatic or manual."
+        else:
+            cleaned["impact_mode"] = mode
+
+    if "impact_funds_basis" in data:
+        basis = str(data.get("impact_funds_basis") or "").strip().lower()
+        if basis not in IMPACT_BASES:
+            errors["impact_funds_basis"] = "Choose which funds count."
+        else:
+            cleaned["impact_funds_basis"] = basis
+
+    if "impact_funds_percent" in data:
+        try:
+            percent = int(str(data.get("impact_funds_percent")).strip())
+            if not 1 <= percent <= 100:
+                raise ValueError
+            cleaned["impact_funds_percent"] = percent
+        except (TypeError, ValueError):
+            errors["impact_funds_percent"] = "Percentage must be between 1 and 100."
+
+    if "impact_default_view" in data:
+        view = str(data.get("impact_default_view") or "").strip().lower()
+        if view not in IMPACT_VIEWS:
+            errors["impact_default_view"] = "Choose funds or impact."
+        else:
+            cleaned["impact_default_view"] = view
+
+    return cleaned, errors
+
+
 def clean_donation_fields(data):
     cleaned, errors = {}, {}
 

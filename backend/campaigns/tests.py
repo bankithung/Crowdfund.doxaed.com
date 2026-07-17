@@ -325,6 +325,70 @@ class ApiTestCase(TestCase):
                             {"action": "reject"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
 
+    def test_impact_tracking(self):
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug, pk = created["slug"], created["id"]
+        self.assertIsNone(created["impact"])            # off by default
+
+        # ₹2,600 verified (2,000 + 600)
+        anon = Client()
+        for name, amount, ref in (("A", "2000", "TXN1"), ("B", "600", "TXN2")):
+            anon.post(f"/api/public/campaigns/{slug}/donate/",
+                      {"donor_name": name * 3, "amount": amount, "transaction_ref": ref})
+        for donation in Donation.objects.all():
+            self.client.post(f"/api/donations/{donation.pk}/review/",
+                             {"action": "confirm"}, content_type="application/json")
+
+        # enable: ₹13 → 1 kg of cabbage, target 75,000 kg, completed 200 kg
+        update = self.client.post(f"/api/campaigns/{pk}/", {
+            "impact_enabled": "true", "impact_item": "Cabbage", "impact_unit": "kg",
+            "impact_action": "secured", "impact_target": "75000",
+            "impact_mode": "auto", "impact_conv_rupees": "13", "impact_conv_units": "1",
+            "impact_funds_basis": "all", "impact_default_view": "impact",
+            "impact_completed_enabled": "true", "impact_completed_action": "delivered",
+            "impact_completed_qty": "200",
+        })
+        self.assertEqual(update.status_code, 200)
+        impact = update.json()["data"]["campaign"]["impact"]
+        self.assertEqual(impact["secured"], 200)         # 2600 / 13
+        self.assertEqual(impact["target"], 75000.0)
+        self.assertEqual(impact["progress"], 0.3)
+        self.assertEqual(impact["default_view"], "impact")
+        self.assertEqual(impact["completed"], {"action": "delivered", "qty": 200.0})
+        self.assertIsNotNone(impact["updated_at"])
+        settings_blob = update.json()["data"]["campaign"]["impact_settings"]
+        self.assertEqual(settings_blob["impact_conv_rupees"], 13.0)
+
+        # public payload carries impact, but never the raw settings
+        public = anon.get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]
+        self.assertEqual(public["impact"]["secured"], 200)
+        self.assertNotIn("impact_settings", public)
+
+        # percentage basis: 50% of ₹2,600 → 100 kg
+        self.client.post(f"/api/campaigns/{pk}/", {
+            "impact_funds_basis": "percent", "impact_funds_percent": "50"})
+        impact = self.client.get(f"/api/campaigns/{pk}/").json()["data"]["campaign"]["impact"]
+        self.assertEqual(impact["secured"], 100)
+
+        # eligible-after-expenses: (2600 - 600) / 13 ≈ 153.8 kg
+        self.client.post(f"/api/campaigns/{pk}/", {
+            "impact_funds_basis": "eligible", "impact_expenses": "600"})
+        impact = self.client.get(f"/api/campaigns/{pk}/").json()["data"]["campaign"]["impact"]
+        self.assertEqual(impact["secured"], 153.8)
+
+        # manual mode ignores conversion entirely
+        self.client.post(f"/api/campaigns/{pk}/", {
+            "impact_mode": "manual", "impact_manual_value": "12450"})
+        impact = self.client.get(f"/api/campaigns/{pk}/").json()["data"]["campaign"]["impact"]
+        self.assertEqual(impact["secured"], 12450)
+        self.assertEqual(impact["progress"], 16.6)
+
+        # validation
+        bad = self.client.post(f"/api/campaigns/{pk}/", {"impact_funds_percent": "150"})
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("impact_funds_percent", bad.json()["error"]["fields"])
+
     def test_duplicate_transaction_ref_flagged(self):
         from django.core import mail
 

@@ -61,6 +61,39 @@ class Campaign(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ------- impact tracking: "12,450 kg secured" alternate progress view
+    impact_enabled = models.BooleanField(default=False)
+    impact_item = models.CharField(max_length=40, blank=True, default="")    # Cabbage
+    impact_unit = models.CharField(max_length=20, blank=True, default="")    # kg
+    impact_action = models.CharField(max_length=30, blank=True, default="")  # secured
+    impact_target = models.DecimalField(max_digits=14, decimal_places=2,
+                                        null=True, blank=True)               # 75,000
+    impact_mode = models.CharField(max_length=10, default="auto",
+                                   choices=[("auto", "Automatic from verified funds"),
+                                            ("manual", "Updated manually")])
+    # auto mode: ₹<conv_rupees> provides <conv_units> <unit>
+    impact_conv_rupees = models.DecimalField(max_digits=12, decimal_places=2,
+                                             null=True, blank=True)
+    impact_conv_units = models.DecimalField(max_digits=12, decimal_places=2,
+                                            null=True, blank=True)
+    impact_funds_basis = models.CharField(
+        max_length=10, default="all",
+        choices=[("eligible", "Eligible funds after expenses"),
+                 ("all", "All verified funds"),
+                 ("percent", "Percentage of verified funds")])
+    impact_expenses = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    impact_funds_percent = models.PositiveSmallIntegerField(default=100)
+    impact_manual_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    impact_default_view = models.CharField(max_length=10, default="funds",
+                                           choices=[("funds", "Funds"),
+                                                    ("impact", "Impact")])
+    impact_completed_enabled = models.BooleanField(default=False)
+    impact_completed_action = models.CharField(max_length=30, blank=True,
+                                               default="")                   # delivered
+    impact_completed_qty = models.DecimalField(max_digits=14, decimal_places=2,
+                                               default=0)
+    impact_updated_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         constraints = [

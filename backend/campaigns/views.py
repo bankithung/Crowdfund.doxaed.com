@@ -26,7 +26,7 @@ from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
 from .validators import (DONATION_MAX, DONATION_MIN, PHONE_RE, TXN_REF_RE,
                          UPI_RE, clean_campaign_fields, clean_donation_fields,
-                         parse_amount)
+                         clean_impact_fields, parse_amount)
 
 log = logging.getLogger("crowdfund.campaigns")
 
@@ -159,6 +159,8 @@ def campaign_detail_view(request, pk):
     # POST = partial update (multipart-friendly)
     data = request.POST
     cleaned, errors = clean_campaign_fields(data, partial=True)
+    impact_cleaned, impact_errors = clean_impact_fields(data)
+    errors.update(impact_errors)
 
     if "status" in data:
         status = str(data.get("status")).strip().lower()
@@ -189,6 +191,16 @@ def campaign_detail_view(request, pk):
             setattr(campaign, field, cleaned[field])
     if "show_amounts" in data:
         campaign.show_amounts = as_bool(data.get("show_amounts"))
+
+    impact_touched = bool(impact_cleaned)
+    for field, value in impact_cleaned.items():
+        setattr(campaign, field, value)
+    for flag in ("impact_enabled", "impact_completed_enabled"):
+        if flag in data:
+            setattr(campaign, flag, as_bool(data.get(flag)))
+            impact_touched = True
+    if impact_touched:
+        campaign.impact_updated_at = timezone.now()
 
     if qr_content:
         delete_file_quiet(campaign.qr_code)
