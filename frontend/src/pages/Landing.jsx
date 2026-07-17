@@ -53,6 +53,24 @@ const STEPS = [
 const MARQUEE_A = ['0% platform fees', 'Direct to your bank', 'Verified by you']
 const MARQUEE_B = ['No middlemen', 'Your QR', 'Zero custody', 'Supporter wall']
 
+const SHOW_POINTS = [
+  { icon: 'qr', title: 'Your QR, front and center',
+    body: 'Supporters scan and pay you app-to-app. The money never touches us.' },
+  { icon: 'edit', title: 'A story page worth sharing',
+    body: 'Cover gallery, rich story, live progress — one clean link.' },
+  { icon: 'badge-check', title: 'A wall of verified names',
+    body: 'Every supporter listed is one you confirmed against your own statement.' },
+]
+
+const CAUSES = [
+  { img: '/lp/cause-education.webp', title: 'Education',
+    body: 'Tuition, libraries, school supplies — fund the classroom directly.' },
+  { img: '/lp/cause-medical.webp', title: 'Medical care',
+    body: 'Treatment and recovery costs, raised without a cut taken.' },
+  { img: '/lp/cause-community.webp', title: 'Community & emergencies',
+    body: 'Harvests, rebuilds, relief — help that arrives the same day.' },
+]
+
 const SECURITY_ITEMS = [
   { icon: 'lock', title: 'Encrypted in transit', body: 'TLS everywhere, HSTS enforced.' },
   { icon: 'shield', title: 'Hardened accounts', body: 'Argon2id hashing, locked-down sessions.' },
@@ -192,9 +210,21 @@ export default function Landing() {
                     { scaleY: 1, ease: 'none', duration: panels.length - 1 }, 0)
         }
 
+        /* generated imagery drifts gently against the scroll */
+        gsap.utils.toArray('.lp-show-img, .lp-sec-frame img').forEach((img) => {
+          gsap.fromTo(img, { yPercent: 5 }, {
+            yPercent: -5, ease: 'none',
+            scrollTrigger: { trigger: img.closest('section'), start: 'top bottom', end: 'bottom top', scrub: true },
+          })
+        })
+
         /* soft reveals for grid/list content (steps stack on mobile) */
         const revealTargets = [
           ...(desktop ? [] : panels),
+          ...gsap.utils.toArray('.lp-show-item'),
+          ...gsap.utils.toArray('.lp-show-media'),
+          ...gsap.utils.toArray('.lp-cause-card'),
+          ...gsap.utils.toArray('.lp-sec-media'),
           ...gsap.utils.toArray('.lp-sec-item'),
           ...gsap.utils.toArray('.lp-faq-item'),
           ...gsap.utils.toArray('.lp-stat'),
@@ -237,7 +267,7 @@ export default function Landing() {
       <header className="lp-hero">
         <Particles
           className="lp-hero-particles"
-          particleColors={['#6366f1', '#34d399', '#a5b4fc', '#ffffff']}
+          particleColors={['#6366f1', '#d9b36c', '#a5b4fc', '#ffffff']}
           particleCount={240}
           particleSpread={11}
           speed={0.08}
@@ -377,6 +407,31 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ------------------------------------------------ product showcase */}
+      <section className="lp-show">
+        <div className="lp-container lp-show-grid">
+          <div className="lp-show-copy">
+            <p className="lp-kicker">The product</p>
+            <h2 className="lp-display lp-show-title">One page. One QR. Everything verified.</h2>
+            <ul className="lp-show-list">
+              {SHOW_POINTS.map((point) => (
+                <li className="lp-show-item" key={point.title}>
+                  <span className="lp-show-icon"><Icon name={point.icon} size={16} /></span>
+                  <div>
+                    <h3>{point.title}</h3>
+                    <p>{point.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="lp-show-frame lp-show-media">
+            <img className="lp-show-img" src="/lp/qr-glass.webp" loading="lazy" decoding="async"
+                 alt="Glass tile engraved with a QR pattern in premium studio light" />
+          </div>
+        </div>
+      </section>
+
       {/* ---------------------------------------- how it works (pinned) */}
       <section className="lp-pin" id="how">
         <div className="lp-container lp-pin-frame">
@@ -443,6 +498,29 @@ export default function Landing() {
         )}
       </section>
 
+      {/* ------------------------------------------------------- causes */}
+      <section className="lp-causes">
+        <div className="lp-container">
+          <div className="lp-head-center">
+            <p className="lp-kicker">Built for every cause</p>
+            <h2 className="lp-display lp-sect-title">Whatever you're raising for.</h2>
+          </div>
+          <div className="lp-cause-grid">
+            {CAUSES.map((cause) => (
+              <article className="lp-cause-card" key={cause.title}>
+                <div className="lp-cause-media">
+                  <img src={cause.img} loading="lazy" decoding="async" alt={cause.title} />
+                </div>
+                <div className="lp-cause-body">
+                  <h3>{cause.title}</h3>
+                  <p>{cause.body}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* --------------------------------------------------------- security */}
       <section className="lp-security" id="security">
         <CursorGrid
@@ -469,16 +547,22 @@ export default function Landing() {
               and every claim is verified by you.
             </ScrollReveal>
           </div>
-          <div className="lp-security-grid">
-            {SECURITY_ITEMS.map((item) => (
-              <article className="lp-sec-item" key={item.title}>
-                <span className="lp-sec-icon"><Icon name={item.icon} size={16} /></span>
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </div>
-              </article>
-            ))}
+          <div className="lp-sec-flex">
+            <div className="lp-sec-frame lp-sec-media">
+              <img src="/lp/vault.webp" loading="lazy" decoding="async"
+                   alt="Dark glass vault door with a glowing geometric seal" />
+            </div>
+            <div className="lp-security-grid">
+              {SECURITY_ITEMS.map((item) => (
+                <article className="lp-sec-item" key={item.title}>
+                  <span className="lp-sec-icon"><Icon name={item.icon} size={16} /></span>
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -505,11 +589,11 @@ export default function Landing() {
             <SpecularButton
               size="md"
               radius={5}
-              tint="#10b981"
-              tintOpacity={0.18}
+              tint="#d9b36c"
+              tintOpacity={0.16}
               textColor="#ffffff"
-              lineColor="#7df0c6"
-              baseColor="#3d6b5c"
+              lineColor="#ecd7a4"
+              baseColor="#6b5a3d"
               intensity={1.1}
               shineSize={12}
               shineFade={42}
