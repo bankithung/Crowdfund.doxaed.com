@@ -150,24 +150,43 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # ---------------------------------------------------------------- email
-# New-claim alerts to organizers, sent through Amazon SES's SMTP interface.
-# Configure in backend/.env:
-#   EMAIL_HOST=email-smtp.ap-south-1.amazonaws.com
-#   EMAIL_HOST_USER=<SES SMTP username>
-#   EMAIL_HOST_PASSWORD=<SES SMTP password>
-#   DEFAULT_FROM_EMAIL=CrowdFund <no-reply@doxaed.com>   (a SES-verified sender)
-# Without EMAIL_HOST, mail goes to the console log instead of being sent.
+# New-claim alerts to organizers. Backend chosen from backend/.env:
+#
+#   Amazon SES API (production — IAM key, NOT an SMTP login):
+#     EMAIL_BACKEND=django_ses.SESBackend
+#     AWS_SES_REGION_NAME=ap-south-2
+#     AWS_SES_REGION_ENDPOINT=email.ap-south-2.amazonaws.com
+#     AWS_ACCESS_KEY_ID=... / AWS_SECRET_ACCESS_KEY=...
+#     DEFAULT_FROM_EMAIL=CrowdFund <noreply@doxaed.com>   (SES-verified domain)
+#
+#   Plain SMTP (alternative):
+#     EMAIL_HOST=... (+ EMAIL_HOST_USER / EMAIL_HOST_PASSWORD / EMAIL_PORT)
+#
+# Neither set → console backend (mail printed to logs, nothing sent).
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
-if EMAIL_HOST:
+_email_backend = os.environ.get("EMAIL_BACKEND", "")
+if _email_backend:
+    EMAIL_BACKEND = _email_backend
+elif EMAIL_HOST:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
-    EMAIL_TIMEOUT = 10
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# SMTP knobs (used only with the SMTP backend)
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_TIMEOUT = 10
+
+# django-ses knobs (used only with django_ses.SESBackend)
+AWS_SES_REGION_NAME = os.environ.get("AWS_SES_REGION_NAME", "")
+AWS_SES_REGION_ENDPOINT = os.environ.get("AWS_SES_REGION_ENDPOINT", "")
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", f"CrowdFund <no-reply@{DOMAIN}>")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 
 # ---------------------------------------------------------------- i18n
 LANGUAGE_CODE = "en-us"
