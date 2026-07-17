@@ -2098,6 +2098,15 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 .pc-impact-equiv,
 .pc-impact-note { font-size: var(--fs-12); }
 .pc-impact-equiv strong { color: var(--money-strong); }
+.pc-impact-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--money-strong);
+}
 
 /* impact settings form (manage → settings) */
 .impact-fields {

@@ -90,7 +90,8 @@ export default function PublicCampaign() {
   const upiId = effectiveUpiId(campaign)
   const impact = campaign.impact
   const statsView = impact ? (viewChoice || impact.default_view || 'funds') : 'funds'
-  const fmtQty = (value) => new Intl.NumberFormat('en-IN').format(value)
+  const fmtQty = (value) =>
+    new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 }).format(value)
 
   const copyUpi = async () => {
     try {
@@ -258,20 +259,28 @@ export default function PublicCampaign() {
                   <ProgressBar value={impact.progress} />
                   <div className="pc-stats3">
                     <div>
-                      <strong>{Math.min(impact.progress, 999)}%</strong>
-                      <span>of impact target</span>
-                    </div>
-                    {impact.completed && (
-                      <div>
-                        <strong>{fmtQty(impact.completed.qty)}</strong>
-                        <span>{impact.unit} {impact.completed.action}</span>
-                      </div>
-                    )}
-                    <div>
                       <strong>{stats.donors}</strong>
                       <span>verified supporter{stats.donors === 1 ? '' : 's'}</span>
                     </div>
+                    <div>
+                      <strong>{Math.min(impact.progress, 999)}%</strong>
+                      <span>of impact target</span>
+                    </div>
+                    <div>
+                      <strong>{fmtQty(Math.max(0, impact.target - impact.secured))} {impact.unit}</strong>
+                      {/* "secured" → "still to secure" */}
+                      <span>
+                        still to {impact.action?.endsWith('d')
+                          ? impact.action.slice(0, -1) : (impact.action || 'go')}
+                      </span>
+                    </div>
                   </div>
+                  {impact.completed && (
+                    <p className="pc-impact-completed">
+                      <Icon name="check-circle" size={13} />
+                      {fmtQty(impact.completed.qty)} {impact.unit} {impact.completed.action} so far
+                    </p>
+                  )}
                   <p className="pc-impact-note muted">
                     {impact.mode === 'auto'
                       ? <>Based on {inr(impact.basis_funds)} in verified contributions</>
