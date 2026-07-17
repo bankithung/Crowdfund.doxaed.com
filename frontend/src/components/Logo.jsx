@@ -1,18 +1,17 @@
 import { Link } from 'react-router-dom'
 
+/* CrowdFund mark: a QR finder eye whose center is a heart — "scan to give".
+   Pure shapes (no gradient defs), so multiple instances can't collide on ids. */
 export function LogoMark({ size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#4F46E5" />
-          <stop offset="1" stopColor="#059669" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#lg)" />
-      <rect x="14" y="34" width="8" height="14" rx="3" fill="#fff" opacity=".72" />
-      <rect x="28" y="26" width="8" height="22" rx="3" fill="#fff" opacity=".88" />
-      <rect x="42" y="16" width="8" height="32" rx="3" fill="#fff" />
+      <rect x="4" y="4" width="56" height="56" rx="15" fill="#4F46E5" />
+      <rect x="15" y="15" width="34" height="34" rx="8" fill="#fff" />
+      <path
+        transform="translate(21.4 22.2) scale(0.885)"
+        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+        fill="#D9B36C"
+      />
     </svg>
   )
 }
