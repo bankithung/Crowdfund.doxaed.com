@@ -149,6 +149,26 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
+# ---------------------------------------------------------------- email
+# New-claim alerts to organizers, sent through Amazon SES's SMTP interface.
+# Configure in backend/.env:
+#   EMAIL_HOST=email-smtp.ap-south-1.amazonaws.com
+#   EMAIL_HOST_USER=<SES SMTP username>
+#   EMAIL_HOST_PASSWORD=<SES SMTP password>
+#   DEFAULT_FROM_EMAIL=CrowdFund <no-reply@doxaed.com>   (a SES-verified sender)
+# Without EMAIL_HOST, mail goes to the console log instead of being sent.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+    EMAIL_TIMEOUT = 10
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", f"CrowdFund <no-reply@{DOMAIN}>")
+
 # ---------------------------------------------------------------- i18n
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Kolkata"

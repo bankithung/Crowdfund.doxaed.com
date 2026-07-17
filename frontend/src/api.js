@@ -77,6 +77,8 @@ export const CampaignApi = {
   analytics: (id) => api(`/api/campaigns/${id}/analytics/`),
   review: (donationId, action, note = '') =>
     api(`/api/donations/${donationId}/review/`, { method: 'POST', body: { action, note } }),
+  editDonation: (donationId, fields) =>
+    api(`/api/donations/${donationId}/edit/`, { method: 'POST', body: fields }),
   addImage: (id, form) => api(`/api/campaigns/${id}/images/`, { method: 'POST', form }),
   removeImage: (id, imageId) =>
     api(`/api/campaigns/${id}/images/${imageId}/`, { method: 'DELETE' }),

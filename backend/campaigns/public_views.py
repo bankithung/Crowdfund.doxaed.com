@@ -14,6 +14,7 @@ from django.utils.html import escape
 
 from core.api import (as_bool, err, methods, ok, paginate, rate_limit)
 
+from .emails import notify_owner_new_claim
 from .images import ImageError, process_image
 from .models import Campaign, Donation
 from .serializers import campaign_dict, donor_public_dict, share_url
@@ -161,6 +162,7 @@ def public_donate_view(request, slug):
     donation.save()
     log.info("donation submitted id=%s campaign=%s amount=%s", donation.pk,
              campaign.pk, donation.amount)
+    notify_owner_new_claim(donation)   # organizer verifies faster when pinged
     return ok({"donation": {
         "public_id": donation.public_id,
         "status": donation.status,

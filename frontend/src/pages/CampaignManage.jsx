@@ -33,6 +33,8 @@ export default function CampaignManage() {
   const [error, setError] = useState('')
   const [proofOf, setProofOf] = useState(null)      // donation whose proof is open
   const [rejecting, setRejecting] = useState(null)  // donation being rejected
+  const [editing, setEditing] = useState(null)      // donation being edited
+  const [listVersion, setListVersion] = useState(0) // bump → verify/table reload
 
   const load = useCallback(() => {
     CampaignApi.analytics(id)
@@ -120,11 +122,13 @@ export default function CampaignManage() {
           {tab === 'overview' && <Overview campaign={campaign} analytics={analytics} />}
           {tab === 'verify' && (
             <VerifyQueue campaignId={campaign.id} onStatsChange={onStatsChange}
-                         openProof={setProofOf} openReject={setRejecting} />
+                         openProof={setProofOf} openReject={setRejecting}
+                         openEdit={setEditing} refresh={listVersion} />
           )}
           {tab === 'donations' && (
             <DonationsTable campaignId={campaign.id} onStatsChange={onStatsChange}
-                            openProof={setProofOf} openReject={setRejecting} />
+                            openProof={setProofOf} openReject={setRejecting}
+                            openEdit={setEditing} refresh={listVersion} />
           )}
           {tab === 'settings' && (
             <SettingsTab campaign={campaign}
@@ -136,7 +140,17 @@ export default function CampaignManage() {
 
           <ProofModal donation={proofOf} onClose={() => setProofOf(null)} />
           <RejectModal donation={rejecting} onClose={() => setRejecting(null)}
-                       onDone={(stats) => { setRejecting(null); onStatsChange(stats) }} />
+                       onDone={(stats) => {
+                         setRejecting(null)
+                         onStatsChange(stats)
+                         setListVersion((v) => v + 1)
+                       }} />
+          <EditModal donation={editing} onClose={() => setEditing(null)}
+                     onDone={(stats) => {
+                       setEditing(null)
+                       onStatsChange(stats)
+                       setListVersion((v) => v + 1)
+                     }} />
         </>
       )}
     </AppShell>
@@ -224,7 +238,7 @@ function StatMini({ label, value, icon, foot, warn }) {
 
 /* --------------------------------------------------------------- verify */
 
-function VerifyQueue({ campaignId, onStatsChange, openProof, openReject }) {
+function VerifyQueue({ campaignId, onStatsChange, openProof, openReject, openEdit, refresh }) {
   const toast = useToast()
   const [items, setItems] = useState(null)
   const [busyId, setBusyId] = useState(null)
@@ -233,7 +247,7 @@ function VerifyQueue({ campaignId, onStatsChange, openProof, openReject }) {
     CampaignApi.donations(campaignId, { status: 'pending', page_size: 50 })
       .then((data) => setItems(data.donations))
       .catch((err) => toast.error(err.message))
-  }, [campaignId, toast])
+  }, [campaignId, toast, refresh])
 
   useEffect(() => { load() }, [load])
 
@@ -306,6 +320,10 @@ function VerifyQueue({ campaignId, onStatsChange, openProof, openReject }) {
                     onClick={() => openReject(donation)}>
               <Icon name="x" size={15} /> Reject
             </button>
+            <button className="btn btn-ghost" disabled={busyId === donation.id}
+                    onClick={() => openEdit(donation)}>
+              <Icon name="edit" size={14} /> Edit
+            </button>
           </div>
         </article>
       ))}
@@ -322,7 +340,7 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
 ]
 
-function DonationsTable({ campaignId, onStatsChange, openProof, openReject }) {
+function DonationsTable({ campaignId, onStatsChange, openProof, openReject, openEdit, refresh }) {
   const toast = useToast()
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
@@ -339,7 +357,7 @@ function DonationsTable({ campaignId, onStatsChange, openProof, openReject }) {
         .catch((err) => toast.error(err.message))
     }, search ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [campaignId, status, search, page, toast])
+  }, [campaignId, status, search, page, toast, refresh])
 
   useEffect(() => { setPage(1) }, [status, search])
 
@@ -445,6 +463,11 @@ function DonationsTable({ campaignId, onStatsChange, openProof, openReject }) {
                           <Icon name="refresh" size={13} /> Re-review
                         </button>
                       )}
+                      <button className="btn btn-ghost btn-sm" disabled={busyId === donation.id}
+                              onClick={() => openEdit(donation)} title="Edit claim details"
+                              aria-label={`Edit claim from ${donation.donor_name}`}>
+                        <Icon name="edit" size={13} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -970,6 +993,78 @@ function ProofModal({ donation, onClose }) {
             <p className="muted">Transaction ID: <strong>{donation.transaction_ref}</strong></p>
           )}
         </div>
+      )}
+    </Modal>
+  )
+}
+
+/* Fix a claim after submission — a mistaken anonymous tick, a name typo,
+   a wrong amount. Proof and audit fields stay read-only. */
+function EditModal({ donation, onClose, onDone }) {
+  const toast = useToast()
+  const [form, setForm] = useState({ donor_name: '', amount: '', message: '', is_anonymous: false })
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (donation) {
+      setForm({
+        donor_name: donation.donor_name,
+        amount: String(donation.amount),
+        message: donation.message || '',
+        is_anonymous: donation.is_anonymous,
+      })
+      setErrors({})
+    }
+  }, [donation?.id])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+
+  const save = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setErrors({})
+    try {
+      const data = await CampaignApi.editDonation(donation.id, form)
+      toast.success('Claim updated')
+      onDone(data.campaign_stats)
+    } catch (err) {
+      setErrors(err.fields || {})
+      if (!err.fields) toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open={!!donation} onClose={onClose} title="Edit claim"
+           subtitle={donation ? `Ref ${donation.public_id} · submitted ${timeAgo(donation.created_at)}` : ''}>
+      {donation && (
+        <form onSubmit={save} noValidate>
+          <div className="form-row">
+            <Field label="Supporter name" required error={errors.donor_name}>
+              <input className="input" value={form.donor_name} maxLength={60}
+                     onChange={(e) => set('donor_name')(e.target.value)} />
+            </Field>
+            <Field label="Amount (₹)" required error={errors.amount}>
+              <input className="input" inputMode="decimal" value={form.amount}
+                     onChange={(e) => set('amount')(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Message" error={errors.message} hint="Shown on the public wall.">
+            <input className="input" value={form.message} maxLength={280}
+                   onChange={(e) => set('message')(e.target.value)} />
+          </Field>
+          <Check checked={form.is_anonymous} onChange={set('is_anonymous')}>
+            Hide the name on the public wall (show as “Anonymous”)
+          </Check>
+          <div className="form-nav">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? <Spinner size={14} /> : 'Save changes'}
+            </button>
+          </div>
+        </form>
       )}
     </Modal>
   )

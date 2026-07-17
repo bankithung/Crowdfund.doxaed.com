@@ -28,5 +28,21 @@ pulls, installs backend/frontend deps, runs migrations, rebuilds the frontend,
 collects static files and restarts services. Push to `main` and the site
 updates itself within ~2 minutes.
 
+## Email alerts (Amazon SES)
+
+Organizers get an email the moment a payment claim is submitted. Mail is sent
+through Amazon SES's SMTP interface — add to `backend/.env` on the server:
+
+```
+EMAIL_HOST=email-smtp.ap-south-1.amazonaws.com
+EMAIL_HOST_USER=<SES SMTP username>
+EMAIL_HOST_PASSWORD=<SES SMTP password>
+DEFAULT_FROM_EMAIL=CrowdFund <no-reply@doxaed.com>
+```
+
+The From address (or its domain) must be verified in SES, and the SES account
+moved out of sandbox mode to mail arbitrary organizer addresses. Without
+`EMAIL_HOST` configured, mail is logged to the console instead of sent.
+
 Secrets (`backend/.env`, admin credentials) and user uploads never leave the
 server — they are gitignored.

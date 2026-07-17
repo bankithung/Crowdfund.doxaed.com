@@ -236,6 +236,35 @@ class ApiTestCase(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "campaign_closed")
 
+    def test_new_claim_emails_the_organizer(self):
+        from django.core import mail
+
+        self.signup()
+        slug = self.create_campaign().json()["data"]["campaign"]["slug"]
+        Client().post(f"/api/public/campaigns/{slug}/donate/", {
+            "donor_name": "Vikram Iyer", "amount": "2000",
+            "transaction_ref": "TXN-2026-0042", "payer_id": "vikram@okaxis",
+            "message": "All the best", "is_anonymous": "true",
+        })
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ["owner@example.com"])
+        self.assertIn("₹2,000", sent.subject)
+        self.assertIn("Vikram Iyer", sent.body)
+        self.assertIn("TXN-2026-0042", sent.body)
+        self.assertIn("vikram@okaxis", sent.body)
+        self.assertIn("Anonymous", sent.body)
+        self.assertIn("tab=verify", sent.body)
+
+        # honeypot submissions never email anyone
+        mail.outbox.clear()
+        Client().post(f"/api/public/campaigns/{slug}/donate/", {
+            "donor_name": "Bot Bot", "amount": "100",
+            "transaction_ref": "BOT1234", "website": "http://spam.example",
+        })
+        self.assertEqual(len(mail.outbox), 0)
+
     # ------------------------------------------------- review & donor wall
 
     def test_review_flow_and_donor_wall(self):
@@ -290,6 +319,59 @@ class ApiTestCase(TestCase):
                    content_type="application/json")
         denied = other.post(f"/api/donations/{ids['Vikram Iyer']}/review/",
                             {"action": "reject"}, content_type="application/json")
+        self.assertEqual(denied.status_code, 404)
+
+    def test_owner_edits_claim(self):
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug = created["slug"]
+
+        # supporter ticked anonymous by mistake and typo'd their name
+        Client().post(f"/api/public/campaigns/{slug}/donate/",
+                      {"donor_name": "Bendangchuba Hedmaster", "amount": "200",
+                       "transaction_ref": "TXN9", "is_anonymous": "true"})
+        donation = Donation.objects.first()
+        self.client.post(f"/api/donations/{donation.pk}/review/", {"action": "confirm"},
+                         content_type="application/json")
+
+        wall = Client().get(f"/api/public/campaigns/{slug}/donors/").json()["data"]
+        self.assertEqual(wall["donors"][0]["name"], "Anonymous")
+
+        edited = self.client.post(
+            f"/api/donations/{donation.pk}/edit/",
+            {"donor_name": "Bendangchuba Headmaster", "amount": "2000",
+             "is_anonymous": "false"},
+            content_type="application/json")
+        self.assertEqual(edited.status_code, 200)
+        data = edited.json()["data"]
+        self.assertEqual(data["donation"]["donor_name"], "Bendangchuba Headmaster")
+        self.assertFalse(data["donation"]["is_anonymous"])
+        self.assertEqual(data["campaign_stats"]["raised"], 2000.0)
+
+        wall = Client().get(f"/api/public/campaigns/{slug}/donors/").json()["data"]
+        self.assertEqual(wall["donors"][0]["name"], "Bendangchuba Headmaster")
+        self.assertEqual(wall["donors"][0]["amount"], 2000.0)
+
+        # untouched fields survive an edit; proof/audit fields can't change
+        donation.refresh_from_db()
+        self.assertEqual(donation.transaction_ref, "TXN9")
+        self.assertEqual(donation.status, "confirmed")
+
+        # validation and scoping
+        bad = self.client.post(f"/api/donations/{donation.pk}/edit/",
+                               {"amount": "0"}, content_type="application/json")
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("amount", bad.json()["error"]["fields"])
+        empty = self.client.post(f"/api/donations/{donation.pk}/edit/", {},
+                                 content_type="application/json")
+        self.assertEqual(empty.status_code, 400)
+
+        other = Client()
+        other.post("/api/auth/signup/",
+                   {"name": "Other P", "email": "o2@example.com", "password": "str0ng-pass-123"},
+                   content_type="application/json")
+        denied = other.post(f"/api/donations/{donation.pk}/edit/",
+                            {"donor_name": "Hijack"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
 
     def test_hidden_amounts_wall(self):

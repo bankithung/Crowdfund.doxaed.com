@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/campaigns/<int:pk>/analytics/", camp.campaign_analytics_view),
     path("api/campaigns/<int:pk>/export/", camp.campaign_export_view),
     path("api/donations/<int:pk>/review/", camp.donation_review_view),
+    path("api/donations/<int:pk>/edit/", camp.donation_edit_view),
     path("api/donations/<int:pk>/proof/", camp.donation_proof_view),
 
     # Public

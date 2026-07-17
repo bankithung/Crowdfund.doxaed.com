@@ -7,6 +7,7 @@ import datetime
 import logging
 import mimetypes
 
+from django.core.exceptions import ValidationError
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.conf import settings
@@ -22,7 +23,8 @@ from .images import (ImageError, decode_qr_payload, delete_file_quiet,
 from .models import Campaign, CampaignImage, Donation
 from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
-from .validators import clean_campaign_fields
+from .validators import (DONATION_MAX, DONATION_MIN, clean_campaign_fields,
+                         parse_amount)
 
 log = logging.getLogger("crowdfund.campaigns")
 
@@ -292,6 +294,64 @@ def donation_review_view(request, pk):
     return ok({
         "donation": donation_admin_dict(donation),
         "campaign_stats": campaign_dict(campaign, private=True)["stats"],
+    })
+
+
+@methods("POST")
+@require_login
+def donation_edit_view(request, pk):
+    """Fix a claim after submission — a mistaken anonymous tick, a name typo,
+    a wrong amount. Owner-scoped; only the fields sent are touched, and the
+    audit trail (proof, ref, timestamps, status) stays intact."""
+    donation = get_object_or_404(Donation.objects.select_related("campaign"),
+                                 pk=pk, campaign__owner=request.user)
+    try:
+        data = parse_body(request)
+    except BodyError as exc:
+        return err(str(exc), 400, "bad_body")
+
+    errors, fields = {}, []
+
+    if "donor_name" in data:
+        name = str(data.get("donor_name") or "").strip()
+        if not 2 <= len(name) <= 60:
+            errors["donor_name"] = "Name should be 2–60 characters."
+        else:
+            donation.donor_name = name
+            fields.append("donor_name")
+
+    if "amount" in data:
+        try:
+            donation.amount = parse_amount(data.get("amount"),
+                                           DONATION_MIN, DONATION_MAX, "amount")
+            fields.append("amount")
+        except ValidationError as exc:
+            errors["amount"] = exc.messages[0]
+
+    if "message" in data:
+        message = str(data.get("message") or "").strip()
+        if len(message) > 280:
+            errors["message"] = "Message must be at most 280 characters."
+        else:
+            donation.message = message
+            fields.append("message")
+
+    if "is_anonymous" in data:
+        donation.is_anonymous = as_bool(data.get("is_anonymous"))
+        fields.append("is_anonymous")
+
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation",
+                   fields=errors)
+    if not fields:
+        return err("Nothing to update.", 400, "validation")
+
+    donation.save(update_fields=fields)
+    log.info("donation %s edited (%s) by owner=%s", donation.pk,
+             ",".join(fields), request.user.pk)
+    return ok({
+        "donation": donation_admin_dict(donation),
+        "campaign_stats": campaign_dict(donation.campaign, private=True)["stats"],
     })
 
 
