@@ -1868,6 +1868,12 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 
 /* two-column content: left = story + wall, right = payment rail */
+/* On big monitors the page reads as a document, not a dashboard — cap the
+   campaign page's width so the story column stays proportionate to its card. */
+.pc-head .container,
+.container.pc-hero-content,
+.container.pc-layout { max-width: 1200px; }
+
 .pc-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 396px);
