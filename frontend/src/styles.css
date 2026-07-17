@@ -2148,12 +2148,13 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   .wall-table td[data-th]::before { display: none; }
   .wall-table .td-msg { display: none; }
   .wall-table .cell-name { flex-wrap: nowrap; min-width: 0; }
-  /* full names, always — wrap onto extra lines rather than truncate */
-  .wall-table td:first-child { white-space: normal; }
+  /* one-line rows: long names ellipsize — tapping the row opens the
+     detail sheet with the full name */
   .wall-table .cell-name strong {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40vw;
   }
   /* the wall header already states every name is verified — the per-row
      badge just doesn't fit a one-line phone row */
