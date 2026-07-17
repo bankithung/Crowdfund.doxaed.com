@@ -389,6 +389,28 @@ class ApiTestCase(TestCase):
         self.assertEqual(bad.status_code, 400)
         self.assertIn("impact_funds_percent", bad.json()["error"]["fields"])
 
+        # the settings form submits EVERY field — empty optionals must never 400
+        form_like = {
+            "impact_enabled": "false", "impact_item": "", "impact_unit": "",
+            "impact_action": "", "impact_target": "", "impact_mode": "auto",
+            "impact_conv_rupees": "", "impact_conv_units": "1",
+            "impact_funds_basis": "all", "impact_expenses": "",
+            "impact_funds_percent": "100", "impact_manual_value": "",
+            "impact_default_view": "funds", "impact_completed_enabled": "false",
+            "impact_completed_action": "", "impact_completed_qty": "",
+        }
+        off = self.client.post(f"/api/campaigns/{pk}/", form_like)
+        self.assertEqual(off.status_code, 200)
+        self.assertIsNone(off.json()["data"]["campaign"]["impact"])
+
+        # ...but enabling does require a target and a conversion
+        missing = self.client.post(f"/api/campaigns/{pk}/",
+                                   {**form_like, "impact_enabled": "true"})
+        self.assertEqual(missing.status_code, 400)
+        fields = missing.json()["error"]["fields"]
+        self.assertIn("impact_target", fields)
+        self.assertIn("impact_conv_rupees", fields)
+
     def test_duplicate_transaction_ref_flagged(self):
         from django.core import mail
 

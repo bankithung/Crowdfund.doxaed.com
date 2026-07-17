@@ -594,7 +594,8 @@ function ImpactSettingsCard({ campaign, onSaved }) {
       toast.success('Impact tracking saved')
     } catch (err) {
       setErrors(err.fields || {})
-      if (!err.fields) toast.error(err.message)
+      // always toast — a field error may sit in a section that's collapsed
+      toast.error(err.message)
     } finally {
       setBusy(false)
     }

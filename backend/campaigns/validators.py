@@ -138,10 +138,13 @@ def clean_impact_fields(data):
     if "impact_completed_action" in data:
         text("impact_completed_action", "Completed action word", 30)
 
-    def amount(key, label, lo, hi, *, allow_empty=False):
+    def amount(key, label, lo, hi, empty):
+        """Empty input means 'not set' — mapped to the field's natural
+        empty value, never a validation error (the form always submits
+        every field, including hidden ones)."""
         raw = str(data.get(key) or "").strip()
-        if not raw and allow_empty:
-            cleaned[key] = None
+        if not raw:
+            cleaned[key] = empty
             return
         try:
             cleaned[key] = parse_amount(raw, lo, hi, label)
@@ -149,21 +152,23 @@ def clean_impact_fields(data):
             errors[key] = exc.messages[0]
 
     if "impact_target" in data:
-        amount("impact_target", "impact target", Decimal("1"), Decimal("1000000000"))
+        amount("impact_target", "impact target",
+               Decimal("1"), Decimal("1000000000"), None)
     if "impact_conv_rupees" in data:
-        amount("impact_conv_rupees", "conversion amount", Decimal("0.01"),
-               Decimal("100000000"))
+        amount("impact_conv_rupees", "conversion amount",
+               Decimal("0.01"), Decimal("100000000"), None)
     if "impact_conv_units" in data:
-        amount("impact_conv_units", "conversion quantity", Decimal("0.01"),
-               Decimal("100000000"))
+        amount("impact_conv_units", "conversion quantity",
+               Decimal("0.01"), Decimal("100000000"), None)
     if "impact_expenses" in data:
-        amount("impact_expenses", "expenses", Decimal("0"), Decimal("1000000000"))
+        amount("impact_expenses", "expenses",
+               Decimal("0"), Decimal("1000000000"), Decimal("0"))
     if "impact_manual_value" in data:
-        amount("impact_manual_value", "impact value", Decimal("0"),
-               Decimal("1000000000"))
+        amount("impact_manual_value", "impact value",
+               Decimal("0"), Decimal("1000000000"), Decimal("0"))
     if "impact_completed_qty" in data:
-        amount("impact_completed_qty", "completed quantity", Decimal("0"),
-               Decimal("1000000000"))
+        amount("impact_completed_qty", "completed quantity",
+               Decimal("0"), Decimal("1000000000"), Decimal("0"))
 
     if "impact_mode" in data:
         mode = str(data.get("impact_mode") or "").strip().lower()
@@ -180,13 +185,17 @@ def clean_impact_fields(data):
             cleaned["impact_funds_basis"] = basis
 
     if "impact_funds_percent" in data:
-        try:
-            percent = int(str(data.get("impact_funds_percent")).strip())
-            if not 1 <= percent <= 100:
-                raise ValueError
-            cleaned["impact_funds_percent"] = percent
-        except (TypeError, ValueError):
-            errors["impact_funds_percent"] = "Percentage must be between 1 and 100."
+        raw = str(data.get("impact_funds_percent") or "").strip()
+        if not raw:
+            cleaned["impact_funds_percent"] = 100
+        else:
+            try:
+                percent = int(raw)
+                if not 1 <= percent <= 100:
+                    raise ValueError
+                cleaned["impact_funds_percent"] = percent
+            except (TypeError, ValueError):
+                errors["impact_funds_percent"] = "Percentage must be between 1 and 100."
 
     if "impact_default_view" in data:
         view = str(data.get("impact_default_view") or "").strip().lower()

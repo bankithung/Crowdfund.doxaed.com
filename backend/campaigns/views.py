@@ -162,6 +162,23 @@ def campaign_detail_view(request, pk):
     impact_cleaned, impact_errors = clean_impact_fields(data)
     errors.update(impact_errors)
 
+    # Cross-field: an enabled impact view needs a target, and auto mode
+    # needs the ₹→unit conversion. Checked against the post-update state.
+    if impact_cleaned or "impact_enabled" in data:
+        enabled = (as_bool(data.get("impact_enabled"))
+                   if "impact_enabled" in data else campaign.impact_enabled)
+        if enabled:
+            if not impact_cleaned.get("impact_target", campaign.impact_target):
+                errors.setdefault(
+                    "impact_target",
+                    "Set an impact target to enable impact tracking.")
+            mode = impact_cleaned.get("impact_mode", campaign.impact_mode)
+            if mode == "auto" and not impact_cleaned.get(
+                    "impact_conv_rupees", campaign.impact_conv_rupees):
+                errors.setdefault(
+                    "impact_conv_rupees",
+                    "Set the conversion — how many rupees provide one unit.")
+
     if "status" in data:
         status = str(data.get("status")).strip().lower()
         if status not in {"active", "paused", "ended"}:
