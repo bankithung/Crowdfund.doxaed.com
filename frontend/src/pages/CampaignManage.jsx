@@ -574,10 +574,33 @@ function ImpactSettingsCard({ campaign, onSaved }) {
   const [busy, setBusy] = useState(false)
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
-  const input = (key, extra = {}) => (
+  const input = (key, extra = {}, onChange = null) => (
     <input className="input" value={form[key]} {...extra}
-           onChange={(e) => set(key)(e.target.value)} />
+           onChange={(e) => (onChange || set(key))(e.target.value)} />
   )
+
+  /* Target and conversion are two views of the same equation against the
+     ₹ goal — whichever the organizer edits drives the other. */
+  const goal = campaign.stats.goal
+  const round2 = (value) => Math.round(value * 100) / 100
+  const setTarget = (raw) => setForm((f) => {
+    const next = { ...f, impact_target: raw }
+    const target = parseFloat(raw)
+    const units = parseFloat(f.impact_conv_units) || 1
+    if (goal > 0 && target > 0) {
+      next.impact_conv_rupees = String(round2((goal * units) / target))
+    }
+    return next
+  })
+  const setConversion = (key) => (raw) => setForm((f) => {
+    const next = { ...f, [key]: raw }
+    const rupees = parseFloat(next.impact_conv_rupees)
+    const units = parseFloat(next.impact_conv_units) || 1
+    if (goal > 0 && rupees > 0) {
+      next.impact_target = String(round2((goal / rupees) * units))
+    }
+    return next
+  })
 
   const save = async (event) => {
     event.preventDefault()
@@ -633,8 +656,10 @@ function ImpactSettingsCard({ campaign, onSaved }) {
                      hint="Reads as “12,450 kg secured”.">
                 {input('impact_action', { maxLength: 30, placeholder: 'e.g. secured' })}
               </Field>
-              <Field label={`Impact target (${unit})`} required error={errors.impact_target}>
-                {input('impact_target', { inputMode: 'decimal', placeholder: 'e.g. 75000' })}
+              <Field label={`Impact target (${unit})`} required error={errors.impact_target}
+                     hint={`Linked to your ${inr(goal)} goal — typing here sets the conversion.`}>
+                {input('impact_target', { inputMode: 'decimal', placeholder: 'e.g. 75000' },
+                       setTarget)}
               </Field>
             </div>
 
@@ -649,14 +674,20 @@ function ImpactSettingsCard({ campaign, onSaved }) {
                   <span className="field-label">Conversion</span>
                   <div className="impact-conv">
                     <span>₹</span>
-                    {input('impact_conv_rupees', { inputMode: 'decimal', placeholder: '13' })}
+                    {input('impact_conv_rupees', { inputMode: 'decimal', placeholder: '13' },
+                           setConversion('impact_conv_rupees'))}
                     <span>provides</span>
-                    {input('impact_conv_units', { inputMode: 'decimal', placeholder: '1' })}
+                    {input('impact_conv_units', { inputMode: 'decimal', placeholder: '1' },
+                           setConversion('impact_conv_units'))}
                     <span>{unit}</span>
                   </div>
-                  {(errors.impact_conv_rupees || errors.impact_conv_units) && (
+                  {errors.impact_conv_rupees || errors.impact_conv_units ? (
                     <span className="field-error">
                       {errors.impact_conv_rupees || errors.impact_conv_units}
+                    </span>
+                  ) : (
+                    <span className="field-hint">
+                      Typing here sets the impact target instead.
                     </span>
                   )}
                 </div>
