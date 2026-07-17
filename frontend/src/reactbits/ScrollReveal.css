@@ -1,0 +1,15 @@
+/* Patched: type stays under the app's 24px ceiling. */
+.scroll-reveal { margin: 0; }
+
+.scroll-reveal-text {
+  font-size: 20px;
+  line-height: 1.6;
+  font-weight: 600;
+  margin: 0;
+}
+
+@media (min-width: 760px) {
+  .scroll-reveal-text { font-size: 23px; line-height: 1.55; }
+}
+
+.word { display: inline-block; }

@@ -1,0 +1,15 @@
+/* Patched: type stays under the app's 24px ceiling. */
+.scroll-float {
+  overflow: hidden;
+  margin: 0;
+}
+
+.scroll-float-text {
+  display: inline-block;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.4;
+}
+
+.char { display: inline-block; }

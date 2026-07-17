@@ -1,0 +1,22 @@
+# secrets — never commit
+backend/.env
+deploy/ADMIN_CREDENTIALS.txt
+
+# user uploads (QRs, covers, payment proofs)
+media/
+
+# build artifacts & deps
+backend/venv/
+frontend/node_modules/
+frontend/dist/
+staticfiles/
+logs/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# misc
+*.log
+.DS_Store

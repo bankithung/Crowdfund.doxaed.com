@@ -1,0 +1,10 @@
+[Unit]
+Description=Check every 15 min whether crowdfund.doxaed.com DNS is live
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

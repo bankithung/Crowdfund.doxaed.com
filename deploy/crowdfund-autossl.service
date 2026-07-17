@@ -1,0 +1,7 @@
+[Unit]
+Description=CrowdFund auto-SSL (activates HTTPS once DNS points here)
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/ubuntu/Crowdfund.doxaed.com/deploy/auto_ssl.sh

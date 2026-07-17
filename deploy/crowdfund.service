@@ -1,0 +1,25 @@
+[Unit]
+Description=CrowdFund gunicorn (crowdfund.doxaed.com)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+User=ubuntu
+Group=www-data
+UMask=0007
+RuntimeDirectory=crowdfund
+WorkingDirectory=/home/ubuntu/Crowdfund.doxaed.com/backend
+ExecStart=/home/ubuntu/Crowdfund.doxaed.com/backend/venv/bin/gunicorn core.wsgi:application \
+    --bind unix:/run/crowdfund/gunicorn.sock \
+    --workers 2 --threads 2 --timeout 60 \
+    --max-requests 500 --max-requests-jitter 50 \
+    --access-logfile - --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
