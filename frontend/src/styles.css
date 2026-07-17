@@ -2435,7 +2435,13 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   .pc-hero { height: clamp(300px, 62vw, 420px); }
   .pc-hero-content { padding-bottom: 64px; }
   .pc-layout-overlap { margin-top: -44px; }
-  .pc-layout { grid-template-columns: 1fr; gap: 24px; padding-bottom: 96px; }
+  .pc-layout { grid-template-columns: 1fr; gap: 24px; padding-bottom: 24px; }
+  /* keep the wall→footer seam tight; the fixed pay bar instead gets its
+     clearance from extra footer padding so the last lines stay readable */
+  main:has(.pc-layout) + .footer { margin-top: 0; }
+  main:has(.pc-sticky-cta) + .footer .footer-inner {
+    padding-bottom: calc(30px + 74px + env(safe-area-inset-bottom));
+  }
   /* unwrap both columns: raised-so-far card FIRST (with Donate/verify CTAs),
      then the story, then the scan-to-pay card, share, wall last */
   .pc-left, .pc-aside, .pc-aside-stack { display: contents; }
