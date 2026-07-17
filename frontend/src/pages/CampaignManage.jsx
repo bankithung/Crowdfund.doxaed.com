@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { CampaignApi } from '../api.js'
+import { CampaignApi, PublicApi } from '../api.js'
 import { Check, CopyField, EmptyState, Field, ImageInput, ProgressBar,
          SkeletonRows, Spinner, StatusBadge } from '../components/bits.jsx'
 import { CropperModal } from '../components/Cropper.jsx'
@@ -481,6 +481,14 @@ function DonationsTable({ campaignId, onStatsChange, openProof, openReject, open
                               aria-label={`Edit claim from ${donation.donor_name}`}>
                         <Icon name="edit" size={13} />
                       </button>
+                      {donation.status === 'confirmed' && (
+                        <a className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer"
+                           href={PublicApi.receiptUrl(donation.public_id)}
+                           title="Download receipt"
+                           aria-label={`Download receipt for ${donation.donor_name}`}>
+                          <Icon name="download" size={13} />
+                        </a>
+                      )}
                     </td>
                   </tr>
                 ))}

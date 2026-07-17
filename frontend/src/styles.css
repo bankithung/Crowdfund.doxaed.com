@@ -1998,6 +1998,22 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 /* the Donate button lands here with room for the sticky header */
 .pc-pay-card { scroll-margin-top: 74px; }
+.pc-wall { scroll-margin-top: 74px; }
+
+/* "view supporters" jump link — for readers who never scroll */
+.pc-wall-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: center;
+  margin-top: 2px;
+  padding: 4px 6px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--primary-strong);
+}
+.pc-wall-link:hover { text-decoration: underline; }
 .pc-sep {
   display: flex;
   align-items: center;
@@ -2320,7 +2336,9 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   margin: 6px auto 15px;
 }
 .status-lookup { display: flex; gap: 8px; }
-.status-lookup .input { flex: 1; text-transform: uppercase; }
+/* no uppercase transform — UPI IDs and emails are lowercase by nature */
+.status-lookup .input { flex: 1; }
+.status-result .btn { margin-top: 4px; }
 .status-result { border-top: 1px solid var(--line); padding-top: 15px; margin-top: 6px; }
 .status-result .badge { margin-bottom: 10px; }
 

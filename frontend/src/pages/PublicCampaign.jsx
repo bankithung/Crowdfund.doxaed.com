@@ -81,6 +81,8 @@ export default function PublicCampaign() {
 
   const scrollToPay = () =>
     document.getElementById('pay')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scrollToWall = () =>
+    document.getElementById('supporters')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   const gallery = (campaign.gallery || []).map((g) => g.url)
   const hasCover = gallery.length > 0
@@ -202,6 +204,13 @@ export default function PublicCampaign() {
                     <Icon name="check-circle" size={15} /> Already paid? Verify your payment
                   </button>
                 </div>
+              )}
+              {stats.donors > 0 && (
+                <button className="pc-wall-link" onClick={scrollToWall}>
+                  <Icon name="users" size={13} /> View the {stats.donors} verified
+                  supporter{stats.donors === 1 ? '' : 's'}
+                  <Icon name="chevron-down" size={13} />
+                </button>
               )}
             </div>
 
@@ -541,9 +550,10 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
           <span className="claim-done-icon"><Icon name="check-circle" size={30} /></span>
           <p className="modal-text">
             Thanks{form.donor_name ? `, ${form.donor_name.split(' ')[0]}` : ''}! Once the
-            organizer verifies your payment, your name joins the supporter wall.
+            organizer verifies your payment, your name joins the supporter wall — and your
+            receipt becomes available from “Check your claim status”.
           </p>
-          <Field label="Your reference code — save it to check status">
+          <Field label="Your reference code — save it for status &amp; receipt">
             <CopyField value={done.public_id} />
           </Field>
           <div className="form-nav">
@@ -654,7 +664,7 @@ const STATUS_COPY = {
 
 function StatusModal({ open, initialRef, onClose }) {
   const [ref, setRef] = useState(initialRef)
-  const [result, setResult] = useState(null)
+  const [results, setResults] = useState(null)   // array once searched
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -665,28 +675,26 @@ function StatusModal({ open, initialRef, onClose }) {
     if (!ref.trim()) return
     setBusy(true)
     setError('')
-    setResult(null)
+    setResults(null)
     try {
-      const data = await PublicApi.status(ref.trim().toUpperCase())
-      setResult(data.donation)
+      const data = await PublicApi.lookup(ref.trim())
+      setResults(data.donations)
     } catch (err) {
-      setError(err.status === 404
-        ? 'No claim found for that reference code — double-check and try again.'
-        : err.message)
+      setError(err.message)
     } finally {
       setBusy(false)
     }
   }
 
-  const meta = result ? STATUS_COPY[result.status] : null
-
   return (
-    <Modal open={open} onClose={onClose} title="Check your claim status">
+    <Modal open={open} onClose={onClose} title="Check your claim status"
+           subtitle="Find it with whatever you have — nothing else needed.">
       <form onSubmit={lookup} noValidate>
-        <Field label="Reference code" hint="Your 8-character code (e.g. G7KM24QZ).">
+        <Field label="Reference code, UPI transaction ID, or your UPI ID / phone"
+               hint="e.g. G7KM24QZ · 415023456789 · name@okaxis · 98XXXXXXXX">
           <div className="status-lookup">
             <input className="input" value={ref} onChange={(e) => setRef(e.target.value)}
-                   placeholder="e.g. G7KM24QZ" maxLength={12} autoCapitalize="characters" />
+                   placeholder="Enter any of these" maxLength={64} />
             <button className="btn btn-primary" disabled={busy || !ref.trim()}>
               {busy ? <Spinner size={14} /> : 'Check'}
             </button>
@@ -694,25 +702,41 @@ function StatusModal({ open, initialRef, onClose }) {
         </Field>
       </form>
       {error && <div className="alert alert-danger"><Icon name="alert" size={15} />{error}</div>}
-      {result && meta && (
-        <div className="status-result">
-          <span className={`badge ${meta.cls}`}>
-            <Icon name={meta.icon} size={12} /> {meta.label}
-          </span>
-          <p className="modal-text">
-            <strong>{inr(result.amount)}</strong> from <strong>{result.donor_name}</strong> to
-            “{result.campaign_title}” · submitted {timeAgo(result.created_at)}
-            {result.reviewed_at && <> · reviewed {timeAgo(result.reviewed_at)}</>}
-          </p>
-          <p className="muted">{meta.body}</p>
-          {result.status === 'rejected' && result.review_note && (
-            <div className="callout">
-              <Icon name="info" size={14} />
-              <p>Organizer's note: “{result.review_note}”</p>
-            </div>
-          )}
+      {results && results.length === 0 && (
+        <div className="alert alert-warn">
+          <Icon name="info" size={15} />
+          No claim matches that — double-check the code, transaction ID or UPI ID/phone
+          you submitted with.
         </div>
       )}
+      {(results || []).map((result) => {
+        const meta = STATUS_COPY[result.status]
+        return (
+          <div className="status-result" key={result.public_id}>
+            <span className={`badge ${meta.cls}`}>
+              <Icon name={meta.icon} size={12} /> {meta.label}
+            </span>
+            <p className="modal-text">
+              <strong>{inr(result.amount)}</strong> from <strong>{result.donor_name}</strong> to
+              “{result.campaign_title}” · submitted {timeAgo(result.created_at)}
+              {result.reviewed_at && <> · reviewed {timeAgo(result.reviewed_at)}</>}
+            </p>
+            <p className="muted">{meta.body}</p>
+            {result.status === 'confirmed' && (
+              <a className="btn btn-money-soft btn-sm" target="_blank" rel="noreferrer"
+                 href={PublicApi.receiptUrl(result.public_id)}>
+                <Icon name="download" size={14} /> Download receipt
+              </a>
+            )}
+            {result.status === 'rejected' && result.review_note && (
+              <div className="callout">
+                <Icon name="info" size={14} />
+                <p>Organizer's note: “{result.review_note}”</p>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </Modal>
   )
 }

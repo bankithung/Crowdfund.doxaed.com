@@ -94,4 +94,6 @@ export const PublicApi = {
   donate: (slug, form) => api(`/api/public/campaigns/${slug}/donate/`, { method: 'POST', form }),
   parseScreenshot: (form) => api('/api/public/parse-screenshot/', { method: 'POST', form }),
   status: (ref) => api(`/api/public/donations/${encodeURIComponent(ref)}/`),
+  lookup: (q) => api(`/api/public/donations/lookup/?q=${encodeURIComponent(q)}`),
+  receiptUrl: (publicId) => `/api/public/donations/${encodeURIComponent(publicId)}/receipt/`,
 }

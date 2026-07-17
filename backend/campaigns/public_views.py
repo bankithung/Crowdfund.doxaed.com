@@ -6,7 +6,7 @@ import logging
 import re
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -171,13 +171,8 @@ def public_donate_view(request, slug):
     }}, status=201)
 
 
-@methods("GET")
-def public_donation_status_view(request, public_id):
-    if rate_limit(request, "status_check", 30, 600):
-        return err("Too many checks — please wait a few minutes.", 429, "throttled")
-    donation = get_object_or_404(Donation.objects.select_related("campaign"),
-                                 public_id=public_id.strip().upper())
-    return ok({"donation": {
+def _status_dict(donation):
+    return {
         "public_id": donation.public_id,
         "status": donation.status,
         "donor_name": donation.donor_name,
@@ -187,7 +182,123 @@ def public_donation_status_view(request, public_id):
         "reviewed_at": donation.reviewed_at.isoformat() if donation.reviewed_at else None,
         "campaign_title": donation.campaign.title,
         "campaign_slug": donation.campaign.slug,
-    }})
+    }
+
+
+@methods("GET")
+def public_donation_status_view(request, public_id):
+    if rate_limit(request, "status_check", 30, 600):
+        return err("Too many checks — please wait a few minutes.", 429, "throttled")
+    donation = get_object_or_404(Donation.objects.select_related("campaign"),
+                                 public_id=public_id.strip().upper())
+    return ok({"donation": _status_dict(donation)})
+
+
+@methods("GET")
+def public_donation_lookup_view(request):
+    """Find claims by whatever the supporter still has: the reference code,
+    the UPI transaction ID, or the UPI ID / phone number they paid from."""
+    if rate_limit(request, "status_check", 30, 600):
+        return err("Too many checks — please wait a few minutes.", 429, "throttled")
+    q = str(request.GET.get("q") or "").strip()
+    if len(q) < 4:
+        return err("Enter at least 4 characters to search.", 400, "validation")
+    matches = (Donation.objects.select_related("campaign")
+               .filter(Q(public_id__iexact=q) |
+                       Q(transaction_ref__iexact=q) |
+                       Q(payer_id__iexact=q))
+               .order_by("-created_at")[:5])
+    return ok({"donations": [_status_dict(d) for d in matches]})
+
+
+RECEIPT_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Receipt {public_id} — CrowdFund</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+         background: #eef0f6; color: #171a26; padding: 28px 14px; }}
+  .sheet {{ max-width: 560px; margin: 0 auto; background: #fff;
+           border: 1px solid #dfe3ee; border-radius: 8px; overflow: hidden; }}
+  .head {{ display: flex; justify-content: space-between; align-items: center;
+          padding: 18px 24px; border-bottom: 3px solid #12b76a; }}
+  .brand {{ font-size: 17px; font-weight: 800; }}
+  .brand span {{ color: #0e9f5d; }}
+  .tag {{ font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+         color: #667085; text-transform: uppercase; }}
+  .body {{ padding: 24px; }}
+  .amount {{ font-size: 34px; font-weight: 800; color: #0e9f5d; }}
+  .from {{ margin-top: 4px; color: #475467; font-size: 14px; }}
+  .from strong {{ color: #171a26; }}
+  table {{ width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 13.5px; }}
+  td {{ padding: 9px 0; border-top: 1px solid #eef0f6; vertical-align: top; }}
+  td:first-child {{ color: #667085; width: 42%; }}
+  td:last-child {{ font-weight: 600; text-align: right; overflow-wrap: anywhere; }}
+  .ok {{ display: inline-block; margin-top: 14px; padding: 4px 12px; border-radius: 999px;
+        background: #e7f8f0; color: #0e9f5d; font-size: 12.5px; font-weight: 700; }}
+  .note {{ margin-top: 18px; padding: 12px 14px; background: #f7f8fc; border-radius: 6px;
+          color: #667085; font-size: 12px; line-height: 1.6; }}
+  .actions {{ text-align: center; margin: 18px auto 4px; }}
+  .btn {{ display: inline-block; padding: 10px 22px; border: none; border-radius: 6px;
+         background: #5548e8; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }}
+  @media print {{ body {{ background: #fff; padding: 0; }}
+                 .sheet {{ border: none; }} .actions {{ display: none; }} }}
+</style></head><body>
+<div class="sheet">
+  <div class="head">
+    <span class="brand">Crowd<span>Fund</span></span>
+    <span class="tag">Contribution receipt</span>
+  </div>
+  <div class="body">
+    <div class="amount">{amount}</div>
+    <p class="from">received from <strong>{donor_name}</strong></p>
+    <span class="ok">✓ Verified by the organizer</span>
+    <table>
+      <tr><td>Receipt / reference no.</td><td>{public_id}</td></tr>
+      <tr><td>Fundraiser</td><td>{campaign_title}</td></tr>
+      <tr><td>Organizer</td><td>{organizer}</td></tr>{txn_row}
+      <tr><td>Submitted on</td><td>{created}</td></tr>
+      <tr><td>Verified on</td><td>{reviewed}</td></tr>
+    </table>
+    <p class="note">This receipt acknowledges a voluntary contribution paid through UPI
+    directly to the organizer's account. CrowdFund (crowdfund.doxaed.com) facilitates
+    verification only and does not collect or hold funds. Verify this reference any time
+    at {status_url}</p>
+  </div>
+</div>
+<div class="actions"><button class="btn" onclick="window.print()">Download / Print receipt</button></div>
+</body></html>"""
+
+
+@methods("GET")
+def donation_receipt_view(request, public_id):
+    """Printable receipt — donors reach it from the status check, organizers
+    from the dashboard. Only confirmed contributions have receipts; the
+    unguessable reference code is the access key."""
+    donation = get_object_or_404(
+        Donation.objects.select_related("campaign", "campaign__owner"),
+        public_id=public_id.strip().upper(), status="confirmed")
+    campaign = donation.campaign
+    tz = timezone.get_current_timezone()
+    fmt = lambda dt: dt.astimezone(tz).strftime("%d %b %Y, %I:%M %p") if dt else "—"  # noqa: E731
+    txn_row = (f"\n      <tr><td>UPI transaction ID</td><td>{escape(donation.transaction_ref)}</td></tr>"
+               if donation.transaction_ref else "")
+    html = RECEIPT_PAGE.format(
+        public_id=escape(donation.public_id),
+        amount=f"₹{donation.amount:,.2f}".rstrip("0").rstrip("."),
+        donor_name=escape(donation.donor_name),
+        campaign_title=escape(campaign.title),
+        organizer=escape(campaign.owner.name),
+        txn_row=txn_row,
+        created=fmt(donation.created_at),
+        reviewed=fmt(donation.reviewed_at),
+        status_url=escape(f"{settings.PUBLIC_BASE_URL}/c/{campaign.slug}?ref={donation.public_id}"),
+    )
+    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response["Cache-Control"] = "private, max-age=300"
+    return response
 
 
 @methods("POST")

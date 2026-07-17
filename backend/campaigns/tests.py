@@ -468,6 +468,39 @@ class ApiTestCase(TestCase):
 
     # ---------------------------------------------------- analytics & CSV
 
+    def test_receipt_and_lookup(self):
+        self.signup()
+        slug = self.create_campaign().json()["data"]["campaign"]["slug"]
+        anon = Client()
+        ref = anon.post(f"/api/public/campaigns/{slug}/donate/", {
+            "donor_name": "Vikram Iyer", "amount": "999.50",
+            "transaction_ref": "TXN-2026-0001", "payer_id": "vikram@okaxis",
+        }).json()["data"]["donation"]["public_id"]
+
+        # no receipt before verification
+        self.assertEqual(anon.get(f"/api/public/donations/{ref}/receipt/").status_code, 404)
+
+        donation = Donation.objects.get(public_id=ref)
+        self.client.post(f"/api/donations/{donation.pk}/review/", {"action": "confirm"},
+                         content_type="application/json")
+
+        receipt = anon.get(f"/api/public/donations/{ref}/receipt/")
+        self.assertEqual(receipt.status_code, 200)
+        page = receipt.content.decode()
+        for text in ("Vikram Iyer", "₹999.5", "TXN-2026-0001", ref,
+                     "Verified by the organizer"):
+            self.assertIn(text, page)
+
+        # lookup works by ref code, transaction ID, and payer UPI/phone
+        for q in (ref, "txn-2026-0001", "VIKRAM@OKAXIS"):
+            found = anon.get(f"/api/public/donations/lookup/?q={q}").json()["data"]
+            self.assertEqual(len(found["donations"]), 1, q)
+            self.assertEqual(found["donations"][0]["public_id"], ref)
+        none = anon.get("/api/public/donations/lookup/?q=NOPE9999").json()["data"]
+        self.assertEqual(none["donations"], [])
+        short = anon.get("/api/public/donations/lookup/?q=ab")
+        self.assertEqual(short.status_code, 400)
+
     def test_analytics_and_export_and_dashboard(self):
         self.signup()
         created = self.create_campaign().json()["data"]["campaign"]

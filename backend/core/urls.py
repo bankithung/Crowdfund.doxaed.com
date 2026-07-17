@@ -34,6 +34,8 @@ urlpatterns = [
     path("api/public/campaigns/<slug:slug>/", public.public_campaign_view),
     path("api/public/campaigns/<slug:slug>/donors/", public.public_donors_view),
     path("api/public/campaigns/<slug:slug>/donate/", public.public_donate_view),
+    path("api/public/donations/lookup/", public.public_donation_lookup_view),
+    path("api/public/donations/<str:public_id>/receipt/", public.donation_receipt_view),
     path("api/public/donations/<str:public_id>/", public.public_donation_status_view),
     path("api/public/parse-screenshot/", public.parse_screenshot_view),
 
