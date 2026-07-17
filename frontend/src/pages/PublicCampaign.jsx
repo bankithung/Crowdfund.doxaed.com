@@ -131,6 +131,7 @@ export default function PublicCampaign() {
       )}
 
       <div className={`container pc-layout ${hasCover ? 'pc-layout-overlap' : ''}`}>
+        <DonorMarquee campaign={campaign} onJump={scrollToWall} />
         <div className="pc-left">
           <main className="pc-main">
             {goalReached && (
@@ -289,6 +290,45 @@ export default function PublicCampaign() {
                      }
                    }} />
     </PublicShell>
+  )
+}
+
+/* ------------------------------------------------------ donor marquee */
+
+/* Auto-scrolling ticker of verified supporters at the top of the page.
+   Tapping it jumps to the wall table. Hidden until someone's verified. */
+function DonorMarquee({ campaign, onJump }) {
+  const [donors, setDonors] = useState(null)
+
+  useEffect(() => {
+    PublicApi.donors(campaign.slug, { sort: 'recent', page: 1 })
+      .then((data) => setDonors(data.donors))
+      .catch(() => setDonors([]))
+  }, [campaign.slug])
+
+  if (!donors || donors.length === 0) return null
+  const items = donors.slice(0, 12)
+
+  return (
+    <div className="pc-marquee-row">
+      <button className="pc-marquee" onClick={onJump}
+              aria-label="View all verified supporters">
+        <div className="pc-marquee-track"
+             style={{ animationDuration: `${Math.max(items.length, 4) * 3.2}s` }}>
+          {[0, 1].map((copy) => (
+            <div className="pc-marquee-group" key={copy} aria-hidden={copy === 1}>
+              {items.map((donor, index) => (
+                <span className="pc-marquee-chip" key={`${copy}-${index}`}>
+                  <Icon name="heart" size={11} />
+                  <strong>{donor.name}</strong>
+                  {donor.amount != null && <em>{inr(donor.amount)}</em>}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </button>
+    </div>
   )
 }
 

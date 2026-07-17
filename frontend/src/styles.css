@@ -1982,6 +1982,57 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 .pc-substats strong { color: var(--ink); }
 
+/* supporter ticker — spans both columns, taps through to the wall */
+.pc-marquee-row { grid-column: 1 / -1; min-width: 0; }
+.pc-marquee {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+/* soft fades at both edges so chips glide in and out */
+.pc-marquee::before,
+.pc-marquee::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  z-index: 1;
+  pointer-events: none;
+}
+.pc-marquee::before { left: 0; background: linear-gradient(to right, var(--surface), transparent); }
+.pc-marquee::after { right: 0; background: linear-gradient(to left, var(--surface), transparent); }
+.pc-marquee-track {
+  display: flex;
+  gap: 26px;
+  width: max-content;
+  animation: pc-marquee 32s linear infinite;
+}
+.pc-marquee:hover .pc-marquee-track { animation-play-state: paused; }
+.pc-marquee-group { display: flex; align-items: center; gap: 26px; }
+.pc-marquee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.pc-marquee-chip .icon { color: var(--money-strong); }
+.pc-marquee-chip strong { color: var(--ink); font-weight: 700; }
+.pc-marquee-chip em { font-style: normal; font-weight: 700; color: var(--money-strong); }
+@keyframes pc-marquee { to { transform: translateX(calc(-50% - 13px)); } }
+@media (prefers-reduced-motion: reduce) {
+  .pc-marquee-track { animation: none; }
+  .pc-marquee { overflow-x: auto; }
+}
+
 /* raised-so-far card (stats + Donate / verify CTAs) */
 .pc-stats-card {
   border-top: 3px solid var(--money);
@@ -2273,6 +2324,7 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   /* unwrap both columns: raised-so-far card FIRST (with Donate/verify CTAs),
      then the story, then the scan-to-pay card, share, wall last */
   .pc-left, .pc-aside, .pc-aside-stack { display: contents; }
+  .pc-marquee-row { order: -1; }
   .pc-stats-card { order: 0; }
   .pc-main { order: 1; }
   .pc-pay-card { order: 2; }
