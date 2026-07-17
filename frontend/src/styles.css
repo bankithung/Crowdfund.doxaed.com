@@ -1018,6 +1018,30 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* same transaction ID on more than one claim — probable duplicate */
+.proof-dupe {
+  background: var(--warn-soft);
+  border-color: var(--warn-border);
+  color: var(--warn);
+  font-weight: 600;
+}
+.proof-dupe em {
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: var(--fs-11);
+  letter-spacing: 0.03em;
+}
+.verify-dupe {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--warn);
+}
+.verify-dupe .icon { margin-top: 1px; flex-shrink: 0; }
+
 .proof-link {
   color: var(--primary-strong);
   border-color: var(--primary-border);

@@ -268,7 +268,25 @@ def campaign_donations_view(request, pk):
                        Q(donor_email__icontains=query))
 
     items, meta = paginate(qs, request, default_size=20)
-    return ok({"donations": [donation_admin_dict(d) for d in items], "meta": meta})
+
+    # Flag transaction IDs that appear on more than one claim of this
+    # campaign — almost always a double-submission or a copied ref.
+    refs = {d.transaction_ref for d in items if d.transaction_ref}
+    dupes = set()
+    if refs:
+        dupes = set(campaign.donations
+                    .filter(transaction_ref__in=refs)
+                    .values("transaction_ref")
+                    .annotate(n=Count("id"))
+                    .filter(n__gt=1)
+                    .values_list("transaction_ref", flat=True))
+    donations = []
+    for donation in items:
+        data = donation_admin_dict(donation)
+        data["duplicate_ref"] = bool(donation.transaction_ref
+                                     and donation.transaction_ref in dupes)
+        donations.append(data)
+    return ok({"donations": donations, "meta": meta})
 
 
 def _add_manual_donation(request, campaign):

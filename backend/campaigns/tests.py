@@ -325,6 +325,33 @@ class ApiTestCase(TestCase):
                             {"action": "reject"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
 
+    def test_duplicate_transaction_ref_flagged(self):
+        from django.core import mail
+
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug, pk = created["slug"], created["id"]
+        anon = Client()
+        anon.post(f"/api/public/campaigns/{slug}/donate/",
+                  {"donor_name": "Cornerstone", "amount": "1000",
+                   "transaction_ref": "126417103717"})
+        mail.outbox.clear()
+        anon.post(f"/api/public/campaigns/{slug}/donate/",
+                  {"donor_name": "Tokavi", "amount": "1000",
+                   "transaction_ref": "126417103717"})
+        anon.post(f"/api/public/campaigns/{slug}/donate/",
+                  {"donor_name": "Unique Guy", "amount": "500",
+                   "transaction_ref": "999888777"})
+
+        listing = self.client.get(f"/api/campaigns/{pk}/donations/").json()["data"]
+        flags = {d["donor_name"]: d["duplicate_ref"] for d in listing["donations"]}
+        self.assertTrue(flags["Cornerstone"])
+        self.assertTrue(flags["Tokavi"])
+        self.assertFalse(flags["Unique Guy"])
+
+        # the alert email for the second claim warns the organizer
+        self.assertIn("ALREADY ON ANOTHER CLAIM", mail.outbox[0].body)
+
     def test_owner_edits_claim(self):
         self.signup()
         created = self.create_campaign().json()["data"]["campaign"]

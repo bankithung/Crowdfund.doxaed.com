@@ -303,8 +303,11 @@ function VerifyQueue({ campaignId, onStatsChange, openProof, openReject, openEdi
               <Icon name="link" size={12} /> {donation.public_id}
             </span>
             {donation.transaction_ref && (
-              <span className="proof-chip" title="UPI transaction ID">
-                <Icon name="qr" size={12} /> {donation.transaction_ref}
+              <span className={`proof-chip ${donation.duplicate_ref ? 'proof-dupe' : ''}`}
+                    title="UPI transaction ID">
+                <Icon name={donation.duplicate_ref ? 'alert' : 'qr'} size={12} />
+                {donation.transaction_ref}
+                {donation.duplicate_ref && <em>duplicate</em>}
               </span>
             )}
             {donation.payer_id && (
@@ -318,6 +321,12 @@ function VerifyQueue({ campaignId, onStatsChange, openProof, openReject, openEdi
               </button>
             )}
           </div>
+          {donation.duplicate_ref && (
+            <p className="verify-dupe">
+              <Icon name="alert" size={13} /> This transaction ID also appears on another
+              claim of this fundraiser — check your statement before confirming.
+            </p>
+          )}
           {donation.message && <p className="verify-message">“{donation.message}”</p>}
           <div className="verify-actions">
             <button className="btn btn-money" disabled={busyId === donation.id}
@@ -437,8 +446,13 @@ function DonationsTable({ campaignId, onStatsChange, openProof, openReject, open
                     <td data-th="Proof">
                       <span className="cell-proofs">
                         {donation.transaction_ref && (
-                          <span className="proof-chip" title={donation.transaction_ref}>
-                            <Icon name="qr" size={11} /> {truncate(donation.transaction_ref, 14)}
+                          <span className={`proof-chip ${donation.duplicate_ref ? 'proof-dupe' : ''}`}
+                                title={donation.duplicate_ref
+                                  ? `${donation.transaction_ref} — this transaction ID appears on more than one claim`
+                                  : donation.transaction_ref}>
+                            <Icon name={donation.duplicate_ref ? 'alert' : 'qr'} size={11} />
+                            {truncate(donation.transaction_ref, 14)}
+                            {donation.duplicate_ref && <em>duplicate</em>}
                           </span>
                         )}
                         {donation.has_screenshot && (

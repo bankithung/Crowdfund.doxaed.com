@@ -134,12 +134,19 @@ def notify_owner_new_claim(donation):
     if not to:
         return
 
+    duplicate = bool(
+        donation.transaction_ref
+        and campaign.donations.filter(transaction_ref=donation.transaction_ref)
+                              .exclude(pk=donation.pk).exists())
+
     amount = f"₹{donation.amount:,.0f}"
     rows = [
         ("Supporter", donation.donor_name
                       + (" (asked to appear as Anonymous)" if donation.is_anonymous else "")),
         ("Amount", amount),
-        ("UPI transaction ID", donation.transaction_ref),
+        ("UPI transaction ID", donation.transaction_ref
+                               + (" — ⚠ ALREADY ON ANOTHER CLAIM" if duplicate else "")
+                               if donation.transaction_ref else ""),
         ("Payer UPI / phone", donation.payer_id),
         ("Screenshot", "Attached to the claim" if donation.screenshot else "Not provided"),
         ("Message", f"“{donation.message}”" if donation.message else ""),
