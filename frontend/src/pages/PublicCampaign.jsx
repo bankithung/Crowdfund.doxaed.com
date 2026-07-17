@@ -37,13 +37,31 @@ export default function PublicCampaign() {
   const [claimOpen, setClaimOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(!!params.get('ref'))
 
-  const load = useCallback(() => {
-    PublicApi.campaign(slug)
+  const load = useCallback((silent = false) => {
+    PublicApi.campaign(slug, { silent })
       .then((data) => setCampaign(data.campaign))
       .catch((err) => { if (err.status === 404) setNotFound(true) })
   }, [slug])
 
   useEffect(() => { load() }, [load])
+
+  /* Live updates: while the tab is visible, refresh the stats, wall and
+     ticker every 20s — new verifications land without a manual reload.
+     Background refreshes are ?silent=1 so they don't inflate view counts. */
+  const [liveTick, setLiveTick] = useState(0)
+  useEffect(() => {
+    const refresh = () => {
+      if (document.hidden) return
+      load(true)
+      setLiveTick((t) => t + 1)
+    }
+    const interval = setInterval(refresh, 20000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [load])
 
   if (notFound) {
     return (
@@ -131,7 +149,7 @@ export default function PublicCampaign() {
       )}
 
       <div className={`container pc-layout ${hasCover ? 'pc-layout-overlap' : ''}`}>
-        <DonorMarquee campaign={campaign} onJump={scrollToWall} />
+        <DonorMarquee campaign={campaign} onJump={scrollToWall} refresh={liveTick} />
         <div className="pc-left">
           <main className="pc-main">
             {goalReached && (
@@ -157,7 +175,7 @@ export default function PublicCampaign() {
             </section>
           </main>
 
-          <SupporterWall campaign={campaign} />
+          <SupporterWall campaign={campaign} refresh={liveTick} />
         </div>
 
         {/* --------------------------------------------- payment rail */}
@@ -297,14 +315,14 @@ export default function PublicCampaign() {
 
 /* Auto-scrolling ticker of verified supporters at the top of the page.
    Tapping it jumps to the wall table. Hidden until someone's verified. */
-function DonorMarquee({ campaign, onJump }) {
+function DonorMarquee({ campaign, onJump, refresh }) {
   const [donors, setDonors] = useState(null)
 
   useEffect(() => {
     PublicApi.donors(campaign.slug, { sort: 'recent', page: 1 })
       .then((data) => setDonors(data.donors))
       .catch(() => setDonors([]))
-  }, [campaign.slug])
+  }, [campaign.slug, refresh])
 
   if (!donors || donors.length === 0) return null
   const items = donors.slice(0, 12)
@@ -339,7 +357,7 @@ const WALL_SORTS = [
   { value: 'top', label: 'Top contributions' },
 ]
 
-function SupporterWall({ campaign }) {
+function SupporterWall({ campaign, refresh }) {
   const [sort, setSort] = useState('recent')
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
@@ -349,7 +367,7 @@ function SupporterWall({ campaign }) {
     PublicApi.donors(campaign.slug, { sort, page })
       .then(setData)
       .catch(() => setData({ donors: [], meta: { page: 1, pages: 1, total: 0 } }))
-  }, [campaign.slug, sort, page])
+  }, [campaign.slug, sort, page, refresh])
 
   useEffect(() => { setPage(1) }, [sort])
 
@@ -752,20 +770,27 @@ function StatusModal({ open, initialRef, onClose }) {
       {(results || []).map((result) => {
         const meta = STATUS_COPY[result.status]
         return (
-          <div className="status-result" key={result.public_id}>
-            <span className={`badge ${meta.cls}`}>
-              <Icon name={meta.icon} size={12} /> {meta.label}
-            </span>
-            <p className="modal-text">
-              <strong>{inr(result.amount)}</strong> from <strong>{result.donor_name}</strong> to
-              “{result.campaign_title}” · submitted {timeAgo(result.created_at)}
-              {result.reviewed_at && <> · reviewed {timeAgo(result.reviewed_at)}</>}
-            </p>
-            <p className="muted">{meta.body}</p>
+          <div className="claim-status-card" key={result.public_id}>
+            <div className="csc-head">
+              <span className={`badge ${meta.cls}`}>
+                <Icon name={meta.icon} size={12} /> {meta.label}
+              </span>
+              <strong className="money-text csc-amount">{inr(result.amount)}</strong>
+            </div>
+            <dl className="csc-rows">
+              <div><dt>From</dt><dd>{result.donor_name}</dd></div>
+              <div><dt>To</dt><dd>“{result.campaign_title}”</dd></div>
+              <div><dt>Submitted</dt><dd>{timeAgo(result.created_at)}</dd></div>
+              {result.reviewed_at && (
+                <div><dt>Reviewed</dt><dd>{timeAgo(result.reviewed_at)}</dd></div>
+              )}
+              <div><dt>Reference</dt><dd>{result.public_id}</dd></div>
+            </dl>
+            <p className="csc-note muted">{meta.body}</p>
             {result.status === 'confirmed' && (
-              <a className="btn btn-money-soft btn-sm" target="_blank" rel="noreferrer"
+              <a className="btn btn-money btn-block" download
                  href={PublicApi.receiptUrl(result.public_id)}>
-                <Icon name="download" size={14} /> Download receipt
+                <Icon name="download" size={15} /> Download receipt (PDF)
               </a>
             )}
             {result.status === 'rejected' && result.review_note && (

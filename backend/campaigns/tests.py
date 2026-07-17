@@ -187,6 +187,10 @@ class ApiTestCase(TestCase):
         anon.get(f"/api/public/campaigns/{slug}/")
         self.assertEqual(Campaign.objects.get(slug=slug).views, 2)
 
+        # live-update polls don't inflate the counter
+        anon.get(f"/api/public/campaigns/{slug}/?silent=1")
+        self.assertEqual(Campaign.objects.get(slug=slug).views, 2)
+
     def test_donate_flow_and_validation(self):
         self.signup()
         slug = self.create_campaign().json()["data"]["campaign"]["slug"]
@@ -490,6 +494,15 @@ class ApiTestCase(TestCase):
         for text in ("Vikram Iyer", "₹999.5", "TXN-2026-0001", ref,
                      "Verified by the organizer"):
             self.assertIn(text, page)
+
+        # real PDF download too — print() is unreliable on phones
+        pdf = anon.get(f"/api/public/donations/{ref}/receipt.pdf")
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+        self.assertIn("attachment", pdf["Content-Disposition"])
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+        self.assertEqual(
+            anon.get("/api/public/donations/NOPE1234/receipt.pdf").status_code, 404)
 
         # lookup works by ref code, transaction ID, and payer UPI/phone
         for q in (ref, "txn-2026-0001", "VIKRAM@OKAXIS"):

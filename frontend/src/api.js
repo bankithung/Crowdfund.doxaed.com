@@ -89,11 +89,12 @@ export const CampaignApi = {
 
 export const PublicApi = {
   index: () => api('/api/public/campaigns/'),
-  campaign: (slug) => api(`/api/public/campaigns/${slug}/`),
+  campaign: (slug, { silent = false } = {}) =>
+    api(`/api/public/campaigns/${slug}/${silent ? '?silent=1' : ''}`),
   donors: (slug, params) => api(`/api/public/campaigns/${slug}/donors/?` + new URLSearchParams(params)),
   donate: (slug, form) => api(`/api/public/campaigns/${slug}/donate/`, { method: 'POST', form }),
   parseScreenshot: (form) => api('/api/public/parse-screenshot/', { method: 'POST', form }),
   status: (ref) => api(`/api/public/donations/${encodeURIComponent(ref)}/`),
   lookup: (q) => api(`/api/public/donations/lookup/?q=${encodeURIComponent(q)}`),
-  receiptUrl: (publicId) => `/api/public/donations/${encodeURIComponent(publicId)}/receipt/`,
+  receiptUrl: (publicId) => `/api/public/donations/${encodeURIComponent(publicId)}/receipt.pdf`,
 }

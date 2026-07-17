@@ -4,20 +4,27 @@ import { Icon } from './Icon.jsx'
 export function Modal({ open, onClose, title, subtitle, children, wide = false, closable = true }) {
   const panelRef = useRef(null)
 
+  /* Autofocus + scroll lock run ONLY when the modal opens. Anything else in
+     the deps (like an inline onClose recreated by a parent re-render — e.g.
+     the live-update poll) would re-run this and yank focus mid-typing. */
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement
     document.body.style.overflow = 'hidden'
+    panelRef.current?.querySelector('input, textarea, button:not(.modal-x)')?.focus?.()
+    return () => {
+      document.body.style.overflow = ''
+      previous?.focus?.()
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
     const onKey = (event) => {
       if (event.key === 'Escape' && closable) onClose()
     }
     document.addEventListener('keydown', onKey)
-    panelRef.current?.querySelector('input, textarea, button:not(.modal-x)')?.focus?.()
-    return () => {
-      document.body.style.overflow = ''
-      document.removeEventListener('keydown', onKey)
-      previous?.focus?.()
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose, closable])
 
   if (!open) return null

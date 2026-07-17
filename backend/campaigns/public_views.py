@@ -15,6 +15,7 @@ from django.utils.html import escape
 from core.api import (as_bool, err, methods, ok, paginate, rate_limit)
 
 from .emails import notify_owner_new_claim
+from .receipts import render_receipt_pdf
 from .images import ImageError, process_image
 from .models import Campaign, Donation
 from .serializers import campaign_dict, donor_public_dict, share_url
@@ -83,7 +84,9 @@ def public_campaigns_index(request):
 @methods("GET")
 def public_campaign_view(request, slug):
     campaign = get_object_or_404(Campaign.objects.select_related("owner"), slug=slug)
-    Campaign.objects.filter(pk=campaign.pk).update(views=F("views") + 1)
+    # live-update polls pass ?silent=1 so background refreshes don't inflate views
+    if not as_bool(request.GET.get("silent", "")):
+        Campaign.objects.filter(pk=campaign.pk).update(views=F("views") + 1)
     data = campaign_dict(campaign)
     data["is_open"] = _campaign_is_open(campaign)
     return ok({"campaign": data})
@@ -240,9 +243,11 @@ RECEIPT_PAGE = """<!doctype html>
         background: #e7f8f0; color: #0e9f5d; font-size: 12.5px; font-weight: 700; }}
   .note {{ margin-top: 18px; padding: 12px 14px; background: #f7f8fc; border-radius: 6px;
           color: #667085; font-size: 12px; line-height: 1.6; }}
-  .actions {{ text-align: center; margin: 18px auto 4px; }}
+  .actions {{ text-align: center; margin: 18px auto 4px; display: flex; gap: 10px; justify-content: center; }}
   .btn {{ display: inline-block; padding: 10px 22px; border: none; border-radius: 6px;
-         background: #5548e8; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }}
+         background: #5548e8; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+         text-decoration: none; }}
+  .btn-ghost {{ background: #fff; color: #475467; border: 1px solid #d5dae6; }}
   @media print {{ body {{ background: #fff; padding: 0; }}
                  .sheet {{ border: none; }} .actions {{ display: none; }} }}
 </style></head><body>
@@ -268,7 +273,10 @@ RECEIPT_PAGE = """<!doctype html>
     at {status_url}</p>
   </div>
 </div>
-<div class="actions"><button class="btn" onclick="window.print()">Download / Print receipt</button></div>
+<div class="actions">
+  <a class="btn" href="{pdf_url}" download>Download PDF</a>
+  <button class="btn btn-ghost" onclick="window.print()">Print</button>
+</div>
 </body></html>"""
 
 
@@ -295,8 +303,24 @@ def donation_receipt_view(request, public_id):
         created=fmt(donation.created_at),
         reviewed=fmt(donation.reviewed_at),
         status_url=escape(f"{settings.PUBLIC_BASE_URL}/c/{campaign.slug}?ref={donation.public_id}"),
+        pdf_url=f"/api/public/donations/{escape(donation.public_id)}/receipt.pdf",
     )
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response["Cache-Control"] = "private, max-age=300"
+    return response
+
+
+@methods("GET")
+def donation_receipt_pdf_view(request, public_id):
+    """The receipt as a real PDF download — window.print() is unreliable in
+    mobile and in-app browsers, a file attachment always works."""
+    donation = get_object_or_404(
+        Donation.objects.select_related("campaign", "campaign__owner"),
+        public_id=public_id.strip().upper(), status="confirmed")
+    pdf = render_receipt_pdf(donation)
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="CrowdFund-receipt-{donation.public_id}.pdf"')
     response["Cache-Control"] = "private, max-age=300"
     return response
 
