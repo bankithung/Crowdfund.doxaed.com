@@ -2239,6 +2239,21 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 .wall-message { color: var(--ink-2); font-style: italic; overflow-wrap: anywhere; }
 .wall-table td { vertical-align: middle; }
 
+/* message indicator — desktop shows the message column, so phones only */
+.wall-msg-dot {
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+@media (max-width: 720px) {
+  .wall-msg-dot { display: inline-grid; }
+}
+
 /* every wall row opens a detail sheet — make that discoverable */
 .wall-row { cursor: pointer; }
 .wall-row:hover td { background: var(--primary-soft); }

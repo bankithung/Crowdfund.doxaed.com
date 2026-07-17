@@ -423,6 +423,12 @@ function SupporterWall({ campaign, refresh }) {
                             : donor.name.slice(0, 1).toUpperCase()}
                         </span>
                         <strong>{donor.name}</strong>
+                        {donor.message && (
+                          <span className="wall-msg-dot" title="Tap to read their message"
+                                aria-label="Left a message">
+                            <Icon name="format-quote" size={11} />
+                          </span>
+                        )}
                         <span className="badge badge-money wall-verified">
                           <Icon name="badge-check" size={11} /> Verified
                         </span>
