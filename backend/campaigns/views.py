@@ -8,6 +8,7 @@ import logging
 import mimetypes
 
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDate
 from django.conf import settings
@@ -23,7 +24,8 @@ from .images import (ImageError, decode_qr_payload, delete_file_quiet,
 from .models import Campaign, CampaignImage, Donation
 from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
-from .validators import (DONATION_MAX, DONATION_MIN, clean_campaign_fields,
+from .validators import (DONATION_MAX, DONATION_MIN, PHONE_RE, TXN_REF_RE,
+                         UPI_RE, clean_campaign_fields, clean_donation_fields,
                          parse_amount)
 
 log = logging.getLogger("crowdfund.campaigns")
@@ -246,10 +248,12 @@ def campaign_image_delete_view(request, pk, image_id):
 
 # --------------------------------------------------------------- donations
 
-@methods("GET")
+@methods("GET", "POST")
 @require_login
 def campaign_donations_view(request, pk):
     campaign = get_owned_campaign(request, pk)
+    if request.method == "POST":
+        return _add_manual_donation(request, campaign)
     qs = campaign.donations.all()
 
     status = request.GET.get("status", "all")
@@ -265,6 +269,42 @@ def campaign_donations_view(request, pk):
 
     items, meta = paginate(qs, request, default_size=20)
     return ok({"donations": [donation_admin_dict(d) for d in items], "meta": meta})
+
+
+def _add_manual_donation(request, campaign):
+    """Organizer records a payment that arrived without a claim — cash, a
+    direct transfer, a supporter who never submitted proof. Created already
+    confirmed: the organizer has seen the money."""
+    try:
+        data = parse_body(request)
+    except BodyError as exc:
+        return err(str(exc), 400, "bad_body")
+
+    cleaned, errors = clean_donation_fields(data)
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation",
+                   fields=errors)
+
+    donation = Donation(
+        campaign=campaign,
+        public_id=Donation.generate_public_id(),
+        donor_name=cleaned["donor_name"],
+        donor_email=cleaned["donor_email"],
+        amount=cleaned["amount"],
+        message=cleaned["message"],
+        is_anonymous=as_bool(data.get("is_anonymous", "")),
+        transaction_ref=cleaned["transaction_ref"],
+        payer_id=cleaned["payer_id"],
+        status="confirmed",
+        reviewed_at=timezone.now(),
+    )
+    donation.save()
+    log.info("manual donation added id=%s campaign=%s amount=%s owner=%s",
+             donation.pk, campaign.pk, donation.amount, request.user.pk)
+    return ok({
+        "donation": donation_admin_dict(donation),
+        "campaign_stats": campaign_dict(campaign, private=True)["stats"],
+    }, status=201)
 
 
 @methods("POST")
@@ -339,6 +379,35 @@ def donation_edit_view(request, pk):
     if "is_anonymous" in data:
         donation.is_anonymous = as_bool(data.get("is_anonymous"))
         fields.append("is_anonymous")
+
+    if "transaction_ref" in data:
+        ref = str(data.get("transaction_ref") or "").strip()
+        if ref and not TXN_REF_RE.match(ref):
+            errors["transaction_ref"] = "Transaction ID should be 4–64 letters, digits or dashes."
+        else:
+            donation.transaction_ref = ref
+            fields.append("transaction_ref")
+
+    if "payer_id" in data:
+        payer = str(data.get("payer_id") or "").strip()
+        if payer and not (UPI_RE.match(payer) or PHONE_RE.match(payer)):
+            errors["payer_id"] = "Enter a valid UPI ID (name@bank) or 10-digit mobile number."
+        else:
+            donation.payer_id = payer
+            fields.append("payer_id")
+
+    if "donor_email" in data:
+        email = str(data.get("donor_email") or "").strip().lower()
+        if email:
+            try:
+                validate_email(email)
+                donation.donor_email = email[:254]
+                fields.append("donor_email")
+            except ValidationError:
+                errors["donor_email"] = "Enter a valid email (or leave it empty)."
+        else:
+            donation.donor_email = ""
+            fields.append("donor_email")
 
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation",

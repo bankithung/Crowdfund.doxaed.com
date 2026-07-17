@@ -34,6 +34,7 @@ export default function CampaignManage() {
   const [proofOf, setProofOf] = useState(null)      // donation whose proof is open
   const [rejecting, setRejecting] = useState(null)  // donation being rejected
   const [editing, setEditing] = useState(null)      // donation being edited
+  const [adding, setAdding] = useState(false)       // manual-contribution modal
   const [listVersion, setListVersion] = useState(0) // bump → verify/table reload
 
   const load = useCallback(() => {
@@ -128,7 +129,8 @@ export default function CampaignManage() {
           {tab === 'donations' && (
             <DonationsTable campaignId={campaign.id} onStatsChange={onStatsChange}
                             openProof={setProofOf} openReject={setRejecting}
-                            openEdit={setEditing} refresh={listVersion} />
+                            openEdit={setEditing} refresh={listVersion}
+                            openAdd={() => setAdding(true)} />
           )}
           {tab === 'settings' && (
             <SettingsTab campaign={campaign}
@@ -151,6 +153,12 @@ export default function CampaignManage() {
                        onStatsChange(stats)
                        setListVersion((v) => v + 1)
                      }} />
+          <AddModal campaignId={campaign.id} open={adding} onClose={() => setAdding(false)}
+                    onDone={(stats) => {
+                      setAdding(false)
+                      onStatsChange(stats)
+                      setListVersion((v) => v + 1)
+                    }} />
         </>
       )}
     </AppShell>
@@ -340,7 +348,7 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
 ]
 
-function DonationsTable({ campaignId, onStatsChange, openProof, openReject, openEdit, refresh }) {
+function DonationsTable({ campaignId, onStatsChange, openProof, openReject, openEdit, refresh, openAdd }) {
   const toast = useToast()
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
@@ -390,9 +398,14 @@ function DonationsTable({ campaignId, onStatsChange, openProof, openReject, open
                    onChange={(e) => setQuery(e.target.value)} aria-label="Search contributions" />
           </div>
         </div>
-        <a className="btn btn-outline btn-sm" href={CampaignApi.exportUrl(campaignId)}>
-          <Icon name="download" size={14} /> Export CSV
-        </a>
+        <div className="table-filters">
+          <button className="btn btn-primary btn-sm" onClick={openAdd}>
+            <Icon name="plus" size={14} /> Add manually
+          </button>
+          <a className="btn btn-outline btn-sm" href={CampaignApi.exportUrl(campaignId)}>
+            <Icon name="download" size={14} /> Export CSV
+          </a>
+        </div>
       </div>
 
       {!data ? <SkeletonRows rows={4} height={44} /> : data.donations.length === 0 ? (
@@ -998,11 +1011,53 @@ function ProofModal({ donation, onClose }) {
   )
 }
 
+/* Every claim detail, editable in one form — shared by Edit and Add. */
+const EMPTY_CLAIM = { donor_name: '', amount: '', message: '', is_anonymous: false,
+                      transaction_ref: '', payer_id: '', donor_email: '' }
+
+function ClaimFieldset({ form, set, errors }) {
+  const input = (key, extra = {}) => (
+    <input className="input" value={form[key]} {...extra}
+           onChange={(e) => set(key)(e.target.value)} />
+  )
+  return (
+    <>
+      <div className="form-row">
+        <Field label="Supporter name" required error={errors.donor_name}>
+          {input('donor_name', { maxLength: 60 })}
+        </Field>
+        <Field label="Amount (₹)" required error={errors.amount}>
+          {input('amount', { inputMode: 'decimal' })}
+        </Field>
+      </div>
+      <div className="form-row">
+        <Field label="UPI transaction ID" error={errors.transaction_ref}>
+          {input('transaction_ref', { maxLength: 64, placeholder: 'optional' })}
+        </Field>
+        <Field label="Payer UPI ID / phone" error={errors.payer_id}>
+          {input('payer_id', { maxLength: 64, placeholder: 'optional' })}
+        </Field>
+      </div>
+      <div className="form-row">
+        <Field label="Email" error={errors.donor_email}>
+          {input('donor_email', { type: 'email', maxLength: 254, placeholder: 'optional' })}
+        </Field>
+        <Field label="Message" error={errors.message} hint="Shown on the public wall.">
+          {input('message', { maxLength: 280 })}
+        </Field>
+      </div>
+      <Check checked={form.is_anonymous} onChange={set('is_anonymous')}>
+        Hide the name on the public wall (show as “Anonymous”)
+      </Check>
+    </>
+  )
+}
+
 /* Fix a claim after submission — a mistaken anonymous tick, a name typo,
-   a wrong amount. Proof and audit fields stay read-only. */
+   a wrong amount. Status and proof screenshot stay read-only. */
 function EditModal({ donation, onClose, onDone }) {
   const toast = useToast()
-  const [form, setForm] = useState({ donor_name: '', amount: '', message: '', is_anonymous: false })
+  const [form, setForm] = useState(EMPTY_CLAIM)
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
 
@@ -1013,6 +1068,9 @@ function EditModal({ donation, onClose, onDone }) {
         amount: String(donation.amount),
         message: donation.message || '',
         is_anonymous: donation.is_anonymous,
+        transaction_ref: donation.transaction_ref || '',
+        payer_id: donation.payer_id || '',
+        donor_email: donation.donor_email || '',
       })
       setErrors({})
     }
@@ -1041,23 +1099,7 @@ function EditModal({ donation, onClose, onDone }) {
            subtitle={donation ? `Ref ${donation.public_id} · submitted ${timeAgo(donation.created_at)}` : ''}>
       {donation && (
         <form onSubmit={save} noValidate>
-          <div className="form-row">
-            <Field label="Supporter name" required error={errors.donor_name}>
-              <input className="input" value={form.donor_name} maxLength={60}
-                     onChange={(e) => set('donor_name')(e.target.value)} />
-            </Field>
-            <Field label="Amount (₹)" required error={errors.amount}>
-              <input className="input" inputMode="decimal" value={form.amount}
-                     onChange={(e) => set('amount')(e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Message" error={errors.message} hint="Shown on the public wall.">
-            <input className="input" value={form.message} maxLength={280}
-                   onChange={(e) => set('message')(e.target.value)} />
-          </Field>
-          <Check checked={form.is_anonymous} onChange={set('is_anonymous')}>
-            Hide the name on the public wall (show as “Anonymous”)
-          </Check>
+          <ClaimFieldset form={form} set={set} errors={errors} />
           <div className="form-nav">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={busy}>
@@ -1066,6 +1108,50 @@ function EditModal({ donation, onClose, onDone }) {
           </div>
         </form>
       )}
+    </Modal>
+  )
+}
+
+/* Record a payment that arrived without a claim — cash, a direct transfer,
+   a supporter who never submitted proof. Goes on the wall immediately. */
+function AddModal({ campaignId, open, onClose, onDone }) {
+  const toast = useToast()
+  const [form, setForm] = useState(EMPTY_CLAIM)
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { if (open) { setForm(EMPTY_CLAIM); setErrors({}) } }, [open])
+
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+
+  const save = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setErrors({})
+    try {
+      const data = await CampaignApi.addDonation(campaignId, form)
+      toast.success(`Recorded ${inr(data.donation.amount)} from ${data.donation.donor_name}`)
+      onDone(data.campaign_stats)
+    } catch (err) {
+      setErrors(err.fields || {})
+      if (!err.fields) toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Record a contribution"
+           subtitle="For payments you received without a claim — added as verified, straight onto the wall.">
+      <form onSubmit={save} noValidate>
+        <ClaimFieldset form={form} set={set} errors={errors} />
+        <div className="form-nav">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-money" disabled={busy}>
+            {busy ? <Spinner size={14} /> : <><Icon name="check" size={14} /> Add to wall</>}
+          </button>
+        </div>
+      </form>
     </Modal>
   )
 }

@@ -352,10 +352,27 @@ class ApiTestCase(TestCase):
         self.assertEqual(wall["donors"][0]["name"], "Bendangchuba Headmaster")
         self.assertEqual(wall["donors"][0]["amount"], 2000.0)
 
-        # untouched fields survive an edit; proof/audit fields can't change
+        # untouched fields survive an edit; status/audit fields can't change
         donation.refresh_from_db()
         self.assertEqual(donation.transaction_ref, "TXN9")
         self.assertEqual(donation.status, "confirmed")
+
+        # every claim detail is editable: ref, payer, email
+        full = self.client.post(
+            f"/api/donations/{donation.pk}/edit/",
+            {"transaction_ref": "TXN9-FIXED", "payer_id": "bendang@okaxis",
+             "donor_email": "bendang@example.com"},
+            content_type="application/json")
+        self.assertEqual(full.status_code, 200)
+        donation.refresh_from_db()
+        self.assertEqual(donation.transaction_ref, "TXN9-FIXED")
+        self.assertEqual(donation.payer_id, "bendang@okaxis")
+        self.assertEqual(donation.donor_email, "bendang@example.com")
+        bad_payer = self.client.post(f"/api/donations/{donation.pk}/edit/",
+                                     {"payer_id": "not a upi"},
+                                     content_type="application/json")
+        self.assertEqual(bad_payer.status_code, 400)
+        self.assertIn("payer_id", bad_payer.json()["error"]["fields"])
 
         # validation and scoping
         bad = self.client.post(f"/api/donations/{donation.pk}/edit/",
@@ -373,6 +390,42 @@ class ApiTestCase(TestCase):
         denied = other.post(f"/api/donations/{donation.pk}/edit/",
                             {"donor_name": "Hijack"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
+
+    def test_owner_records_manual_contribution(self):
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug, pk = created["slug"], created["id"]
+
+        # someone paid directly but never submitted a claim
+        added = self.client.post(
+            f"/api/campaigns/{pk}/donations/",
+            {"donor_name": "Abeio kire", "amount": "10000",
+             "message": "From all of us", "payer_id": "9876543210"},
+            content_type="application/json")
+        self.assertEqual(added.status_code, 201)
+        data = added.json()["data"]
+        self.assertEqual(data["donation"]["status"], "confirmed")
+        self.assertEqual(data["campaign_stats"]["raised"], 10000.0)
+
+        # on the public wall immediately — no review round-trip needed
+        wall = Client().get(f"/api/public/campaigns/{slug}/donors/").json()["data"]
+        self.assertEqual(wall["meta"]["total"], 1)
+        self.assertEqual(wall["donors"][0]["name"], "Abeio kire")
+
+        # validation still applies; no transaction ref/screenshot required
+        bad = self.client.post(f"/api/campaigns/{pk}/donations/",
+                               {"donor_name": "X", "amount": "0"},
+                               content_type="application/json")
+        self.assertEqual(bad.status_code, 400)
+        fields = bad.json()["error"]["fields"]
+        self.assertIn("donor_name", fields)
+        self.assertIn("amount", fields)
+        self.assertNotIn("transaction_ref", fields)
+
+        # owner-scoped: outsiders can't inject contributions
+        self.assertEqual(Client().post(
+            f"/api/campaigns/{pk}/donations/", {"donor_name": "Evil", "amount": "5"},
+            content_type="application/json").status_code, 401)
 
     def test_hidden_amounts_wall(self):
         self.signup()

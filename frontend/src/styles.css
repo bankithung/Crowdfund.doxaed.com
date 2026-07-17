@@ -2004,14 +2004,11 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
 .pc-help { font-size: var(--fs-12); text-align: center; margin-top: -4px; }
 .pc-share { border-top: 1px solid var(--line); padding-top: 13px; }
 .pc-share .mini-label { margin-bottom: 8px; }
-/* all share buttons on one line — they compress rather than wrap */
+/* all share buttons on one line — Copy link and WhatsApp go icon-only
+   (their labels overlap on narrow phones; title/aria keep them named) */
 .pc-share .share-row { justify-content: flex-start; flex-wrap: nowrap; }
-.pc-share .share-row .btn {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0 7px;
-  white-space: nowrap;
-}
+.pc-share .share-row .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; }
+.pc-share .share-row .share-label { display: none; }
 .pc-status-link {
   display: inline-flex;
   align-items: center;

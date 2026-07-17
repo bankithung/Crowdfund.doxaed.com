@@ -22,12 +22,14 @@ export function ShareRow({ url, title }) {
 
   return (
     <div className="share-row" role="group" aria-label="Share this fundraiser">
-      <button className="btn btn-outline btn-sm" onClick={copy}>
-        <Icon name="copy" size={14} /> Copy link
+      <button className="btn btn-outline btn-sm" onClick={copy}
+              title="Copy link" aria-label="Copy link">
+        <Icon name="copy" size={14} /> <span className="share-label">Copy link</span>
       </button>
       <a className="btn btn-outline btn-sm share-wa" target="_blank" rel="noreferrer"
+         title="Share on WhatsApp" aria-label="Share on WhatsApp"
          href={`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`}>
-        <Icon name="whatsapp" size={15} /> WhatsApp
+        <Icon name="whatsapp" size={15} /> <span className="share-label">WhatsApp</span>
       </a>
       <a className="btn btn-outline btn-sm" target="_blank" rel="noreferrer"
          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}>
