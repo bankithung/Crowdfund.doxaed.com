@@ -79,6 +79,9 @@ export default function PublicCampaign() {
     }
   }
 
+  const scrollToPay = () =>
+    document.getElementById('pay')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
   const gallery = (campaign.gallery || []).map((g) => g.url)
   const hasCover = gallery.length > 0
 
@@ -157,8 +160,8 @@ export default function PublicCampaign() {
         {/* --------------------------------------------- payment rail */}
         <aside className="pc-aside">
           <div className="pc-aside-stack">
-            {/* one cohesive support module: amount → scanner → action */}
-            <div className="card pc-card pc-support-card">
+            {/* raised-so-far card — first on the page, above the story */}
+            <div className="card pc-card pc-stats-card">
               <span className="mini-label">
                 <span className="pc-live-dot" aria-hidden="true" /> Raised so far
               </span>
@@ -191,8 +194,21 @@ export default function PublicCampaign() {
               </div>
 
               {!closed && (
-                <>
-                  <div className="pc-sep"><span><Icon name="qr" size={12} /> Scan to pay</span></div>
+                <div className="pc-cta-stack">
+                  <button className="btn btn-money btn-block btn-lg" onClick={scrollToPay}>
+                    <Icon name="heart" size={16} /> Donate
+                  </button>
+                  <button className="btn btn-outline btn-block" onClick={() => setClaimOpen(true)}>
+                    <Icon name="check-circle" size={15} /> Already paid? Verify your payment
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* scan-to-pay card — the Donate button scrolls here */}
+            {!closed && (
+              <div className="card pc-card pc-pay-card" id="pay">
+                <span className="mini-label"><Icon name="qr" size={12} /> Scan to pay</span>
                   <div className="qr-plate">
                     <span className="qr-corner tl" aria-hidden="true" />
                     <span className="qr-corner tr" aria-hidden="true" />
@@ -228,11 +244,10 @@ export default function PublicCampaign() {
                   <p className="pc-help muted">
                     Share your payment screenshot — verified names join the wall.
                   </p>
-                </>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="card pc-card">
+            <div className="card pc-card pc-share-card">
               <button className="pc-status-link" onClick={() => setStatusOpen(true)}>
                 <Icon name="search" size={13} /> Check your claim status
               </button>

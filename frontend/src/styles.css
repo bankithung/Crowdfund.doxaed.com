@@ -1982,14 +1982,22 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 .pc-substats strong { color: var(--ink); }
 
-/* unified support module */
-.pc-support-card {
+/* raised-so-far card (stats + Donate / verify CTAs) */
+.pc-stats-card {
   border-top: 3px solid var(--money);
   background:
     radial-gradient(340px 180px at 100% 0%, #eafaf3 0%, transparent 60%),
     var(--surface);
 }
-.pc-support-card .progress { height: 10px; }
+.pc-stats-card .progress { height: 10px; }
+.pc-cta-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 4px;
+}
+/* the Donate button lands here with room for the sticky header */
+.pc-pay-card { scroll-margin-top: 74px; }
 .pc-sep {
   display: flex;
   align-items: center;
@@ -2246,13 +2254,14 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   .pc-hero-content { padding-bottom: 64px; }
   .pc-layout-overlap { margin-top: -44px; }
   .pc-layout { grid-template-columns: 1fr; gap: 24px; padding-bottom: 96px; }
-  /* unwrap the left column: story FIRST, then raised + scanner rail, wall last —
-     the story sells the cause; the QR meets readers right after it */
-  .pc-left { display: contents; }
-  .pc-main { order: 0; }
-  .pc-aside { order: 1; }
-  .pc-wall { order: 2; }
-  .pc-aside-stack { position: static; }
+  /* unwrap both columns: raised-so-far card FIRST (with Donate/verify CTAs),
+     then the story, then the scan-to-pay card, share, wall last */
+  .pc-left, .pc-aside, .pc-aside-stack { display: contents; }
+  .pc-stats-card { order: 0; }
+  .pc-main { order: 1; }
+  .pc-pay-card { order: 2; }
+  .pc-share-card { order: 3; }
+  .pc-wall { order: 4; }
   .pc-head { padding: 20px 0 18px; }
   .pc-sticky-cta {
     position: fixed;
