@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './Icon.jsx'
 
 export function Modal({ open, onClose, title, subtitle, children, wide = false, closable = true }) {
@@ -28,7 +29,10 @@ export function Modal({ open, onClose, title, subtitle, children, wide = false, 
   }, [open, onClose, closable])
 
   if (!open) return null
-  return (
+  /* Portal to <body>: a modal rendered inside a positioned/z-indexed
+     ancestor (e.g. the hero-overlap layout) would otherwise lose the
+     stacking fight against fixed elements like the sticky pay bar. */
+  return createPortal(
     <div className="modal-overlay" onPointerDown={(e) => {
       if (closable && e.target === e.currentTarget) onClose()
     }}>
@@ -47,6 +51,7 @@ export function Modal({ open, onClose, title, subtitle, children, wide = false, 
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
