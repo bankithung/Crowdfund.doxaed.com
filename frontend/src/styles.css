@@ -2406,14 +2406,23 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   .wall-table tbody tr:last-child td { border-bottom: none; }
   .wall-table td[data-th]::before { display: none; }
   .wall-table .td-msg { display: none; }
+  /* Fixed layout so the table can NEVER outgrow the phone screen: the
+     name column takes whatever remains and ellipsizes; amount and time
+     get exact widths, so nothing is cut off or scrolls sideways. */
+  .wall-table { table-layout: fixed; width: 100%; }
+  .wall-table td { padding: 9px 8px; }
+  .wall-table th { padding: 9px 8px; }
+  .wall-table .td-amt { width: 86px; }
+  .wall-table .td-when { width: 74px; padding-right: 10px; }
   .wall-table .cell-name { flex-wrap: nowrap; min-width: 0; }
   /* one-line rows: long names ellipsize — tapping the row opens the
      detail sheet with the full name */
   .wall-table .cell-name strong {
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 40vw;
   }
   /* the wall header already states every name is verified — the per-row
      badge just doesn't fit a one-line phone row */

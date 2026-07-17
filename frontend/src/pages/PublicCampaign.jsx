@@ -475,9 +475,9 @@ function SupporterWall({ campaign, refresh }) {
               <thead>
                 <tr>
                   <th>Supporter</th>
-                  {campaign.show_amounts && <th>Amount</th>}
+                  {campaign.show_amounts && <th className="td-amt">Amount</th>}
                   <th className="td-msg">Message</th>
-                  <th>When</th>
+                  <th className="td-when">When</th>
                 </tr>
               </thead>
               <tbody>
@@ -511,7 +511,7 @@ function SupporterWall({ campaign, refresh }) {
                       </span>
                     </td>
                     {campaign.show_amounts && (
-                      <td data-th="Amount">
+                      <td data-th="Amount" className="td-amt">
                         <strong className="money-text">{donor.amount != null ? inr(donor.amount) : '—'}</strong>
                       </td>
                     )}
