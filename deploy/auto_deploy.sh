@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Auto-deploy: runs every 2 min via crowdfund-deploy.timer. When origin/main
-# has new commits: pull, install deps, migrate, rebuild frontend, collect
-# static, restart services. Secrets (.env) and media/ are gitignored and
-# survive untouched.
+# is strictly ahead of the local checkout: pull, install deps, migrate,
+# rebuild frontend, collect static, restart services. Secrets (.env) and
+# media/ are gitignored and survive untouched.
 set -euo pipefail
 
 REPO=/home/ubuntu/Crowdfund.doxaed.com
@@ -19,9 +19,15 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
 [ "$LOCAL" = "$REMOTE" ] && exit 0
 
-logger -t "$TAG" "deploying $LOCAL -> $REMOTE"
+# Deploy ONLY fast-forwards: if local is ahead or diverged (work happening
+# on the server), leave it alone rather than destroying commits.
+if ! git merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
+    logger -t "$TAG" "local is ahead/diverged of origin/main — not deploying"
+    exit 0
+fi
 
-# server is a deploy target: take origin/main exactly (ignored files survive)
+logger -t "$TAG" "deploying ${LOCAL:0:7} -> ${REMOTE:0:7}"
+
 git reset --hard origin/main --quiet
 
 # backend
@@ -39,7 +45,7 @@ npm run build >/dev/null
 sudo systemctl restart crowdfund
 sudo nginx -t >/dev/null 2>&1 && sudo systemctl reload nginx
 
-# smoke check — roll the alarm if the app died
+# smoke check
 sleep 2
 if curl -sf -o /dev/null http://127.0.0.1/api/public/campaigns/; then
     logger -t "$TAG" "deploy OK at $(git rev-parse --short HEAD)"
