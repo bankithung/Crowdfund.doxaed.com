@@ -1096,17 +1096,56 @@ function EditModal({ donation, onClose, onDone }) {
 
   return (
     <Modal open={!!donation} onClose={onClose} title="Edit claim"
-           subtitle={donation ? `Ref ${donation.public_id} · submitted ${timeAgo(donation.created_at)}` : ''}>
+           subtitle={donation ? `Ref ${donation.public_id}` : ''}>
       {donation && (
-        <form onSubmit={save} noValidate>
-          <ClaimFieldset form={form} set={set} errors={errors} />
-          <div className="form-nav">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? <Spinner size={14} /> : 'Save changes'}
-            </button>
+        <>
+          {/* everything the supporter sent, at a glance — proof included */}
+          <div className="claim-summary">
+            {donation.has_screenshot ? (
+              <a className="claim-proof-thumb" href={donation.proof_url}
+                 target="_blank" rel="noreferrer"
+                 aria-label="Open the payment screenshot full-size">
+                <img src={donation.proof_url} alt="Payment screenshot" />
+                <span className="claim-proof-zoom"><Icon name="search" size={13} /></span>
+              </a>
+            ) : (
+              <span className="claim-proof-thumb claim-proof-none">
+                <Icon name="camera" size={18} />
+                <small>No screenshot</small>
+              </span>
+            )}
+            <div className="claim-summary-info">
+              <div className="claim-summary-row">
+                <StatusBadge status={donation.status} />
+                <strong className="money-text">{inr(donation.amount)}</strong>
+              </div>
+              <span className="muted">
+                <Icon name="clock" size={12} /> Submitted {dateTime(donation.created_at)}
+              </span>
+              {donation.reviewed_at && (
+                <span className="muted">
+                  <Icon name="badge-check" size={12} /> Reviewed {timeAgo(donation.reviewed_at)}
+                </span>
+              )}
+              {donation.has_screenshot && (
+                <a className="claim-proof-open" href={donation.proof_url}
+                   target="_blank" rel="noreferrer">
+                  <Icon name="external" size={12} /> Open screenshot full-size
+                </a>
+              )}
+            </div>
           </div>
-        </form>
+
+          <form onSubmit={save} noValidate>
+            <ClaimFieldset form={form} set={set} errors={errors} />
+            <div className="form-nav">
+              <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={busy}>
+                {busy ? <Spinner size={14} /> : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </>
       )}
     </Modal>
   )

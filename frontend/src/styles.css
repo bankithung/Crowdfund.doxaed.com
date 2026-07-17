@@ -1565,6 +1565,87 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   border-radius: var(--radius);
   padding: 5px;
 }
+/* claim context inside the Edit-claim modal: proof thumb + audit facts */
+.claim-summary {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  padding: 12px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.claim-proof-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  min-height: 96px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.claim-proof-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.claim-proof-zoom {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.15));
+}
+a.claim-proof-thumb:hover img { opacity: 0.85; }
+.claim-proof-none {
+  flex-direction: column;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--muted);
+}
+.claim-proof-none small { font-size: var(--fs-11); }
+.claim-summary-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-13);
+}
+.claim-summary-info .muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.claim-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.claim-summary-row .money-text { font-size: var(--fs-16); font-weight: 700; }
+.claim-proof-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--primary-strong);
+}
+.claim-proof-open:hover { text-decoration: underline; }
+
 .proof-view img {
   margin-inline: auto;
   max-height: 66vh;
