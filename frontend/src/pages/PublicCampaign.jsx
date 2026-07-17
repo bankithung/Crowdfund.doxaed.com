@@ -220,10 +220,6 @@ export default function PublicCampaign() {
                       UPI ID: <strong>{upiId}</strong>
                     </p>
                   )}
-                  <p className="pc-qr-dl-note muted">
-                    On your phone? Save the QR and use “scan from gallery” in any UPI app.
-                  </p>
-
                   <div className="pc-sep"><span><Icon name="check-circle" size={12} /> After paying</span></div>
                   <button className="btn btn-primary btn-block btn-lg"
                           onClick={() => setClaimOpen(true)}>
@@ -244,10 +240,6 @@ export default function PublicCampaign() {
                 <span className="mini-label">Spread the word</span>
                 <ShareRow url={publicUrl(campaign.slug)} title={campaign.title} />
               </div>
-              <p className="pc-trust muted">
-                <Icon name="shield" size={13} /> Direct-to-organizer payments · every
-                name manually verified.
-              </p>
             </div>
           </div>
         </aside>
@@ -287,6 +279,7 @@ function SupporterWall({ campaign }) {
   const [sort, setSort] = useState('recent')
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
+  const [selected, setSelected] = useState(null)   // donor row → detail sheet
 
   useEffect(() => {
     PublicApi.donors(campaign.slug, { sort, page })
@@ -331,7 +324,15 @@ function SupporterWall({ campaign }) {
               </thead>
               <tbody>
                 {data.donors.map((donor, index) => (
-                  <tr key={`${donor.date}-${index}`}>
+                  <tr key={`${donor.date}-${index}`} className="wall-row" tabIndex={0}
+                      role="button" aria-label={`View contribution from ${donor.name}`}
+                      onClick={() => setSelected(donor)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setSelected(donor)
+                        }
+                      }}>
                     <td data-th="Supporter">
                       <span className="cell-name">
                         <span className="wall-avatar" aria-hidden="true">
@@ -378,7 +379,56 @@ function SupporterWall({ campaign }) {
           )}
         </div>
       )}
+
+      <SupporterModal donor={selected} showAmount={campaign.show_amounts}
+                      onClose={() => setSelected(null)} />
     </section>
+  )
+}
+
+/* Tap a wall row for the full picture — a bottom drawer on phones, a
+   centered dialog on desktop (the Modal handles both). */
+function SupporterModal({ donor, showAmount, onClose }) {
+  return (
+    <Modal open={!!donor} onClose={onClose} title="Contribution details">
+      {donor && (
+        <div className="wall-detail">
+          <div className="wall-detail-head">
+            <span className="wall-avatar wall-avatar-lg" aria-hidden="true">
+              {donor.name === 'Anonymous'
+                ? <Icon name="users" size={17} />
+                : donor.name.slice(0, 1).toUpperCase()}
+            </span>
+            <div className="wall-detail-id">
+              <strong className="wall-detail-name">{donor.name}</strong>
+              <span className="badge badge-money wall-verified">
+                <Icon name="badge-check" size={11} /> Verified by the organizer
+              </span>
+            </div>
+          </div>
+          <dl className="wall-detail-rows">
+            {showAmount && (
+              <div>
+                <dt>Amount</dt>
+                <dd><strong className="money-text">
+                  {donor.amount != null ? inr(donor.amount) : '—'}
+                </strong></dd>
+              </div>
+            )}
+            <div>
+              <dt>When</dt>
+              <dd>{timeAgo(donor.date)} · {shortDate(donor.date)}</dd>
+            </div>
+            {donor.message && (
+              <div>
+                <dt>Message</dt>
+                <dd className="wall-message">“{donor.message}”</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+    </Modal>
   )
 }
 
@@ -429,7 +479,6 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
           donor_name: f.donor_name || detected.payer_name || '',
           transaction_ref: f.transaction_ref || detected.transaction_ref || '',
           amount: f.amount || detected.amount || '',
-          // captured silently — the organizer sees it, the donor never types it
           payer_id: f.payer_id || detected.payer_id || '',
         }))
         setScanned(!!found)
@@ -534,11 +583,16 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
               </p>
             )}
             <div className="claim-or"><span>or</span></div>
-            <Field label="UPI transaction ID" error={errors.transaction_ref}>
+            <Field label="UPI transaction ID" error={errors.transaction_ref}
+                   hint="Needed if you'd like a receipt once the organizer verifies.">
               <input className="input" value={form.transaction_ref} maxLength={64}
                      onChange={setInput('transaction_ref')} placeholder="e.g. 415023456789" />
             </Field>
-            {errors.payer_id && <p className="field-error">{errors.payer_id}</p>}
+            <Field label="Your UPI ID or phone number (optional)" error={errors.payer_id}
+                   hint="Only the organizer sees this — helps match your payment.">
+              <input className="input" value={form.payer_id} maxLength={64}
+                     onChange={setInput('payer_id')} placeholder="e.g. name@okaxis or 98XXXXXXXX" />
+            </Field>
           </section>
 
           <section className="modal-section">

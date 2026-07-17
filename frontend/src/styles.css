@@ -1966,11 +1966,6 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
 }
 .pc-qr-payee .icon { color: var(--money-strong); }
 .pc-qr-payee strong { color: var(--ink); }
-.pc-qr-dl-note {
-  font-size: var(--fs-12);
-  text-align: center;
-  margin-top: -3px;
-}
 .pc-upi-line {
   font-size: var(--fs-12);
   text-align: center;
@@ -2009,7 +2004,14 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
 .pc-help { font-size: var(--fs-12); text-align: center; margin-top: -4px; }
 .pc-share { border-top: 1px solid var(--line); padding-top: 13px; }
 .pc-share .mini-label { margin-bottom: 8px; }
-.pc-share .share-row { justify-content: flex-start; }
+/* all share buttons on one line — they compress rather than wrap */
+.pc-share .share-row { justify-content: flex-start; flex-wrap: nowrap; }
+.pc-share .share-row .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 7px;
+  white-space: nowrap;
+}
 .pc-status-link {
   display: inline-flex;
   align-items: center;
@@ -2021,15 +2023,6 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   padding: 4px;
 }
 .pc-status-link:hover { text-decoration: underline; }
-.pc-trust {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  font-size: var(--fs-12);
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-.pc-trust .icon { margin-top: 2px; color: var(--money-strong); }
 
 .pc-sticky-cta { display: none; }
 
@@ -2093,6 +2086,50 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
 .wall-message { color: var(--ink-2); font-style: italic; overflow-wrap: anywhere; }
 .wall-table td { vertical-align: middle; }
 
+/* every wall row opens a detail sheet — make that discoverable */
+.wall-row { cursor: pointer; }
+.wall-row:hover td { background: var(--primary-soft); }
+.wall-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* supporter detail sheet (drawer on phones, dialog on desktop) */
+.wall-detail { display: flex; flex-direction: column; gap: 16px; }
+.wall-detail-head { display: flex; align-items: center; gap: 12px; }
+.wall-avatar-lg { width: 44px; height: 44px; font-size: var(--fs-16); flex-shrink: 0; }
+.wall-detail-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+.wall-detail-name { font-size: var(--fs-16); overflow-wrap: anywhere; }
+.wall-detail-rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  margin: 0;
+}
+.wall-detail-rows > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wall-detail-rows dt {
+  flex-shrink: 0;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wall-detail-rows dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+
 /* One row per supporter on phones — a real table, not stacked cards. */
 @media (max-width: 720px) {
   .wall-table { display: table; }
@@ -2111,11 +2148,12 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   .wall-table td[data-th]::before { display: none; }
   .wall-table .td-msg { display: none; }
   .wall-table .cell-name { flex-wrap: nowrap; min-width: 0; }
+  /* full names, always — wrap onto extra lines rather than truncate */
+  .wall-table td:first-child { white-space: normal; }
   .wall-table .cell-name strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 38vw;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
   /* the wall header already states every name is verified — the per-row
      badge just doesn't fit a one-line phone row */
@@ -2129,10 +2167,11 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
   .pc-hero-content { padding-bottom: 64px; }
   .pc-layout-overlap { margin-top: -44px; }
   .pc-layout { grid-template-columns: 1fr; gap: 24px; padding-bottom: 96px; }
-  /* unwrap the left column: raised + scanner rail FIRST, then story, wall last */
+  /* unwrap the left column: story FIRST, then raised + scanner rail, wall last —
+     the story sells the cause; the QR meets readers right after it */
   .pc-left { display: contents; }
-  .pc-aside { order: 0; }
-  .pc-main { order: 1; }
+  .pc-main { order: 0; }
+  .pc-aside { order: 1; }
   .pc-wall { order: 2; }
   .pc-aside-stack { position: static; }
   .pc-head { padding: 20px 0 18px; }
