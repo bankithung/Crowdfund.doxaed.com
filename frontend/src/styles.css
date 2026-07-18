@@ -137,7 +137,10 @@ dl, dt, dd { margin: 0; }
 .icon { flex-shrink: 0; }
 
 .mini-label {
-  display: block;
+  /* flex keeps inline icons on the same line as the text */
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--fs-11);
   font-weight: 700;
   text-transform: uppercase;
