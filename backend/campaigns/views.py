@@ -588,11 +588,26 @@ def donation_edit_view(request, pk):
             donation.donor_email = ""
             fields.append("donor_email")
 
+    # add or replace the proof screenshot
+    screenshot_content = None
+    if request.FILES.get("screenshot"):
+        try:
+            screenshot_content, _ = process_image(request.FILES["screenshot"],
+                                                  max_dim=2000, force="auto")
+        except ImageError as exc:
+            errors["screenshot"] = str(exc)
+
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation",
                    fields=errors)
-    if not fields:
+    if not fields and not screenshot_content:
         return err("Nothing to update.", 400, "validation")
+
+    if screenshot_content:
+        delete_file_quiet(donation.screenshot)
+        donation.screenshot.save(screenshot_content.name, screenshot_content,
+                                 save=False)
+        fields.append("screenshot")
 
     donation.save(update_fields=fields)
     log.info("donation %s edited (%s) by owner=%s", donation.pk,

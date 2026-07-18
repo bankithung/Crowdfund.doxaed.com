@@ -552,6 +552,24 @@ class ApiTestCase(TestCase):
         self.assertEqual(bad_payer.status_code, 400)
         self.assertIn("payer_id", bad_payer.json()["error"]["fields"])
 
+        # a screenshot can be added after the fact… (claim had none)
+        self.assertFalse(donation.screenshot)
+        shot = self.client.post(f"/api/donations/{donation.pk}/edit/",
+                                {"screenshot": png_upload("late-proof.png")})
+        self.assertEqual(shot.status_code, 200)
+        self.assertTrue(shot.json()["data"]["donation"]["has_screenshot"])
+        donation.refresh_from_db()
+        first_name = donation.screenshot.name
+        self.assertTrue(first_name.startswith("proofs/"))
+
+        # …and replaced later — the old file gives way to the new one
+        replaced = self.client.post(f"/api/donations/{donation.pk}/edit/",
+                                    {"screenshot": png_upload("better-proof.png")})
+        self.assertEqual(replaced.status_code, 200)
+        donation.refresh_from_db()
+        self.assertTrue(donation.screenshot.name)
+        self.assertNotEqual(donation.screenshot.name, first_name)
+
         # validation and scoping
         bad = self.client.post(f"/api/donations/{donation.pk}/edit/",
                                {"amount": "0"}, content_type="application/json")

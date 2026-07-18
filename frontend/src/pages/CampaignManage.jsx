@@ -1511,8 +1511,10 @@ function ClaimFieldset({ form, set, errors }) {
 function EditModal({ donation, onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_CLAIM)
+  const [newShot, setNewShot] = useState(null)   // added/replacement screenshot
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  const shotRef = useRef(null)
 
   useEffect(() => {
     if (donation) {
@@ -1525,23 +1527,35 @@ function EditModal({ donation, onClose, onDone }) {
         payer_id: donation.payer_id || '',
         donor_email: donation.donor_email || '',
       })
+      setNewShot(null)
       setErrors({})
     }
   }, [donation?.id])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
 
+  const pickShot = (fileList) => {
+    const file = [...(fileList || [])].find((f) => f.type.startsWith('image/'))
+    if (shotRef.current) shotRef.current.value = ''
+    if (file) setNewShot(file)
+  }
+
   const save = async (event) => {
     event.preventDefault()
     setBusy(true)
     setErrors({})
+    const body = new FormData()
+    for (const [key, value] of Object.entries(form)) {
+      body.append(key, typeof value === 'boolean' ? (value ? 'true' : 'false') : value)
+    }
+    if (newShot) body.append('screenshot', newShot)
     try {
-      const data = await CampaignApi.editDonation(donation.id, form)
+      const data = await CampaignApi.editDonation(donation.id, body)
       toast.success('Claim updated')
       onDone(data.campaign_stats)
     } catch (err) {
       setErrors(err.fields || {})
-      if (!err.fields) toast.error(err.message)
+      toast.error(err.message)
     } finally {
       setBusy(false)
     }
@@ -1554,7 +1568,12 @@ function EditModal({ donation, onClose, onDone }) {
         <>
           {/* everything the supporter sent, at a glance — proof included */}
           <div className="claim-summary">
-            {donation.has_screenshot ? (
+            {newShot ? (
+              <span className="claim-proof-thumb">
+                <img src={URL.createObjectURL(newShot)} alt="New payment screenshot" />
+                <span className="claim-proof-zoom"><Icon name="upload" size={13} /></span>
+              </span>
+            ) : donation.has_screenshot ? (
               <a className="claim-proof-thumb" href={donation.proof_url}
                  target="_blank" rel="noreferrer"
                  aria-label="Open the payment screenshot full-size">
@@ -1580,12 +1599,22 @@ function EditModal({ donation, onClose, onDone }) {
                   <Icon name="badge-check" size={12} /> Reviewed {timeAgo(donation.reviewed_at)}
                 </span>
               )}
-              {donation.has_screenshot && (
+              {donation.has_screenshot && !newShot && (
                 <a className="claim-proof-open" href={donation.proof_url}
                    target="_blank" rel="noreferrer">
                   <Icon name="external" size={12} /> Open screenshot full-size
                 </a>
               )}
+              <button type="button" className="claim-proof-open"
+                      onClick={() => shotRef.current?.click()}>
+                <Icon name="camera" size={12} />
+                {newShot
+                  ? 'New screenshot selected — saves with the claim'
+                  : donation.has_screenshot ? 'Replace screenshot' : 'Add screenshot'}
+              </button>
+              {errors.screenshot && <span className="field-error">{errors.screenshot}</span>}
+              <input ref={shotRef} type="file" accept="image/*" hidden
+                     onChange={(e) => pickShot(e.target.files)} />
             </div>
           </div>
 
