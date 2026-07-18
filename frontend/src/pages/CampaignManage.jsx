@@ -579,7 +579,7 @@ function FundUsageCard({ campaign, onSaved }) {
     <div className="card">
       <div className="section-head">
         <div>
-          <h2 className="block-title">How the money is used</h2>
+          <h2 className="block-title">Where your support goes</h2>
           <p className="section-sub">
             Headed photo groups shown under your story — e.g. “Purchasing
             cabbage from farmers” with pictures of the purchase.

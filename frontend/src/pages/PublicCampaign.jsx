@@ -145,7 +145,7 @@ export default function PublicCampaign() {
         </button>
         {(campaign.fund_uses || []).length > 0 && (
           <button onClick={scrollToUsage}>
-            <Icon name="wallet" size={12} /> How the money is used
+            <Icon name="heart" size={12} /> Where your support goes
           </button>
         )}
       </div>
@@ -438,7 +438,7 @@ function FundUsageSection({ fundUses }) {
   return (
     <section className="card pc-usage-card" id="money-use">
       <span className="mini-label">
-        <Icon name="wallet" size={12} /> How the money is used
+        <Icon name="heart" size={12} /> Where your support goes
       </span>
       {fundUses.map((use) => (
         <div className="pc-usage-group" key={use.id}>
