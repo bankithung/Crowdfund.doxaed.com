@@ -2169,7 +2169,7 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 195;   /* above the appbar & sticky bars, below toasts */
   display: grid;
   place-items: center;
   padding: 20px;
@@ -2183,10 +2183,17 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 .lightbox img {
   max-width: 100%;
-  max-height: 82dvh;
+  max-height: 78dvh;
   border-radius: 6px;
   display: block;
   margin-inline: auto;
+}
+.lightbox-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-11);
+  font-weight: 500;
+  color: #77809a;
 }
 .lightbox figcaption {
   margin-top: 12px;

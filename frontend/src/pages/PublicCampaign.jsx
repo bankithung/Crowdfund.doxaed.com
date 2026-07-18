@@ -2,6 +2,7 @@
 // and a three-card payment rail (progress / scan-to-pay / act & share).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { PublicApi } from '../api.js'
 import { AmountChips, Check, CopyField, EmptyState, Field, ImageInput,
@@ -521,7 +522,9 @@ function FundUsageSection({ fundUses, onCopyLink }) {
         </div>
       ))}
 
-      {lightbox && (
+      {lightbox && createPortal(
+        /* portaled to <body> so no header/stacking context can sit on top;
+           tapping anywhere — the photo included — closes it */
         <div className="lightbox" onClick={() => setLightbox(null)} role="dialog"
              aria-modal="true" aria-label={lightbox.use.heading}>
           <button className="lightbox-x" aria-label="Close"
@@ -534,13 +537,14 @@ function FundUsageSection({ fundUses, onCopyLink }) {
               <Icon name="arrow-left" size={20} />
             </button>
           )}
-          <figure onClick={(e) => e.stopPropagation()}>
+          <figure>
             <img src={lightbox.use.images[lightbox.index].url}
                  alt={lightbox.use.heading} />
             <figcaption>
               {lightbox.use.images[lightbox.index].caption || lightbox.use.heading}
               {lightbox.use.images.length > 1 &&
                 <span> · {lightbox.index + 1} / {lightbox.use.images.length}</span>}
+              <span className="lightbox-hint">tap anywhere to close</span>
             </figcaption>
           </figure>
           {lightbox.use.images.length > 1 && (
@@ -549,7 +553,8 @@ function FundUsageSection({ fundUses, onCopyLink }) {
               <Icon name="arrow-right" size={20} />
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   )
