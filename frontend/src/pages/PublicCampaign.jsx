@@ -46,6 +46,28 @@ export default function PublicCampaign() {
 
   useEffect(() => { load() }, [load])
 
+  /* The sticky pay bar only appears once the reader has scrolled PAST the
+     scan-to-pay card — while the stats CTAs or the QR are still ahead/on
+     screen it would just be noise over the story. */
+  const [stickyCta, setStickyCta] = useState(false)
+  useEffect(() => {
+    if (!campaign) return
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const target = document.getElementById('pay')
+        setStickyCta(!!target && target.getBoundingClientRect().bottom < 0)
+      })
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [campaign])
+
   /* Deep link support: /c/<slug>#story etc. scrolls once the page has data. */
   const jumpedRef = useRef(false)
   useEffect(() => {
@@ -417,7 +439,7 @@ export default function PublicCampaign() {
         </aside>
       </div>
 
-      {!closed && (
+      {!closed && stickyCta && (
         <div className="pc-sticky-cta">
           <button className="btn btn-primary btn-lg" onClick={() => setClaimOpen(true)}>
             <Icon name="check-circle" size={16} /> I've made a payment
