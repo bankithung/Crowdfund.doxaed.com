@@ -371,7 +371,7 @@ export default function PublicCampaign() {
 
             <div className="card pc-card pc-share-card">
               <button className="pc-status-link" onClick={() => setStatusOpen(true)}>
-                <Icon name="search" size={13} /> Check your claim status
+                <Icon name="search" size={13} /> Check your claim status or download your receipt
               </button>
               <div className="pc-share">
                 <span className="mini-label">Spread the word</span>
@@ -930,8 +930,8 @@ function StatusModal({ open, initialRef, onClose }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Check your claim status"
-           subtitle="Find it with whatever you have — nothing else needed.">
+    <Modal open={open} onClose={onClose} title="Claim status & receipt"
+           subtitle="Find your contribution with whatever you have — the receipt downloads once it's verified.">
       <form onSubmit={lookup} noValidate>
         <Field label="Reference code, UPI transaction ID, or your UPI ID / phone"
                hint="e.g. G7KM24QZ · 415023456789 · name@okaxis · 98XXXXXXXX">
