@@ -281,7 +281,7 @@ def campaign_image_delete_view(request, pk, image_id):
 # ------------------------------------------------ how the money is used
 
 MAX_FUND_USES = 8
-MAX_FUND_USE_IMAGES = 6
+MAX_FUND_USE_IMAGES = 10
 
 
 def _process_fund_use_uploads(request):

@@ -553,7 +553,7 @@ function FundUsageCard({ campaign, onSaved }) {
     const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/'))
     if (pickRef.current) pickRef.current.value = ''
     if (!files.length) return
-    setPhotos((prev) => [...prev, ...files].slice(0, 6))
+    setPhotos((prev) => [...prev, ...files].slice(0, 10))
   }
 
   const add = async (event) => {
@@ -603,7 +603,7 @@ function FundUsageCard({ campaign, onSaved }) {
                    placeholder="e.g. Purchasing cabbage from farmers" />
           </Field>
           <div className="field">
-            <span className="field-label">Photos (up to 6)</span>
+            <span className="field-label">Photos (up to 10)</span>
             <div className="fund-use-picks">
               {photos.map((file, index) => (
                 <span className="fund-use-pick" key={index}>
@@ -615,7 +615,7 @@ function FundUsageCard({ campaign, onSaved }) {
                   </button>
                 </span>
               ))}
-              {photos.length < 6 && (
+              {photos.length < 10 && (
                 <button type="button" className="fund-use-pick-add"
                         onClick={() => pickRef.current?.click()}>
                   <Icon name="plus" size={16} />
@@ -736,7 +736,7 @@ function FundUseRow({ item, campaign, onSaved }) {
             </button>
           </span>
         ))}
-        {(item.images || []).length < 6 && (
+        {(item.images || []).length < 10 && (
           <button type="button" className="fund-use-pick-add" disabled={busy}
                   onClick={() => addRef.current?.click()}>
             <Icon name="plus" size={16} />
