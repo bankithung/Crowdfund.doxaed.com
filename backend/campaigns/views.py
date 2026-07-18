@@ -21,7 +21,7 @@ from core.api import (BodyError, as_bool, err, methods, ok, paginate,
 
 from .images import (ImageError, decode_qr_payload, delete_file_quiet,
                      process_image)
-from .models import Campaign, CampaignImage, Donation, FundUse
+from .models import Campaign, CampaignImage, Donation, FundUse, FundUseImage
 from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
 from .validators import (DONATION_MAX, DONATION_MIN, PHONE_RE, TXN_REF_RE,
@@ -150,8 +150,9 @@ def campaign_detail_view(request, pk):
             delete_file_quiet(donation.screenshot)
         for extra in campaign.images.all():
             delete_file_quiet(extra.image)
-        for use in campaign.fund_uses.all():
-            delete_file_quiet(use.image)
+        for use in campaign.fund_uses.prefetch_related("images"):
+            for img in use.images.all():
+                delete_file_quiet(img.image)
         delete_file_quiet(campaign.qr_code)
         delete_file_quiet(campaign.cover_image)
         log.info("campaign deleted id=%s owner=%s", campaign.pk, request.user.pk)
@@ -280,15 +281,41 @@ def campaign_image_delete_view(request, pk, image_id):
 # ------------------------------------------------ how the money is used
 
 MAX_FUND_USES = 8
+MAX_FUND_USE_IMAGES = 6
+
+
+def _process_fund_use_uploads(request):
+    """Validate + process every uploaded photo ('images' multi-field, with
+    'image' as a single-file fallback). Returns (contents, error)."""
+    uploads = request.FILES.getlist("images") or (
+        [request.FILES["image"]] if request.FILES.get("image") else [])
+    contents = []
+    for upload in uploads:
+        try:
+            content, _ = process_image(upload, max_dim=2000, force="jpeg")
+            contents.append(content)
+        except ImageError as exc:
+            return [], str(exc)
+    return contents, None
+
+
+def _append_fund_use_images(item, contents):
+    last = item.images.order_by("-position").first()
+    position = (last.position if last else 0)
+    for content in contents:
+        position += 1
+        img = FundUseImage(fund_use=item, position=position)
+        img.image.save(content.name, content, save=False)
+        img.save()
 
 
 @methods("POST")
 @require_login
 def fund_use_add_view(request, pk):
-    """Add a 'how the money is used' entry: heading + photo."""
+    """Add a 'how the money is used' group: heading + one or more photos."""
     campaign = get_owned_campaign(request, pk)
     if campaign.fund_uses.count() >= MAX_FUND_USES:
-        return err(f"Up to {MAX_FUND_USES} items — remove one to add another.",
+        return err(f"Up to {MAX_FUND_USES} headings — remove one to add another.",
                    400, "validation")
 
     errors = {}
@@ -296,36 +323,73 @@ def fund_use_add_view(request, pk):
     if not 3 <= len(heading) <= 120:
         errors["heading"] = "Heading should be 3–120 characters."
 
-    content = None
-    upload = request.FILES.get("image")
-    if not upload:
-        errors["image"] = "Add a photo for this item."
-    else:
-        try:
-            content, _ = process_image(upload, max_dim=2000, force="jpeg")
-        except ImageError as exc:
-            errors["image"] = str(exc)
+    contents, image_error = _process_fund_use_uploads(request)
+    if image_error:
+        errors["image"] = image_error
+    elif not contents:
+        errors["image"] = "Add at least one photo."
+    elif len(contents) > MAX_FUND_USE_IMAGES:
+        errors["image"] = f"Up to {MAX_FUND_USE_IMAGES} photos per heading."
 
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation",
                    fields=errors)
 
     last = campaign.fund_uses.order_by("-position").first()
-    item = FundUse(campaign=campaign, heading=heading,
-                   position=(last.position + 1) if last else 1)
-    item.image.save(content.name, content, save=False)
-    item.save()
-    log.info("fund-use added id=%s campaign=%s", item.pk, campaign.pk)
+    item = FundUse.objects.create(campaign=campaign, heading=heading,
+                                  position=(last.position + 1) if last else 1)
+    _append_fund_use_images(item, contents)
+    log.info("fund-use added id=%s campaign=%s photos=%s", item.pk, campaign.pk,
+             len(contents))
     return ok({"campaign": campaign_dict(campaign, private=True)}, status=201)
+
+
+@methods("POST", "DELETE")
+@require_login
+def fund_use_detail_view(request, pk, item_id):
+    """POST edits the heading and/or appends photos; DELETE removes the
+    whole group (and its files)."""
+    campaign = get_owned_campaign(request, pk)
+    item = get_object_or_404(FundUse, pk=item_id, campaign=campaign)
+
+    if request.method == "DELETE":
+        for img in item.images.all():
+            delete_file_quiet(img.image)
+        item.delete()
+        return ok({"campaign": campaign_dict(campaign, private=True)})
+
+    errors = {}
+    if "heading" in request.POST:
+        heading = str(request.POST.get("heading") or "").strip()
+        if not 3 <= len(heading) <= 120:
+            errors["heading"] = "Heading should be 3–120 characters."
+        else:
+            item.heading = heading
+
+    contents, image_error = _process_fund_use_uploads(request)
+    if image_error:
+        errors["image"] = image_error
+    elif contents and item.images.count() + len(contents) > MAX_FUND_USE_IMAGES:
+        errors["image"] = f"Up to {MAX_FUND_USE_IMAGES} photos per heading."
+
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation",
+                   fields=errors)
+
+    item.save()
+    if contents:
+        _append_fund_use_images(item, contents)
+    return ok({"campaign": campaign_dict(campaign, private=True)})
 
 
 @methods("DELETE")
 @require_login
-def fund_use_delete_view(request, pk, item_id):
+def fund_use_image_delete_view(request, pk, item_id, image_id):
     campaign = get_owned_campaign(request, pk)
-    item = get_object_or_404(FundUse, pk=item_id, campaign=campaign)
-    delete_file_quiet(item.image)
-    item.delete()
+    img = get_object_or_404(FundUseImage, pk=image_id, fund_use_id=item_id,
+                            fund_use__campaign=campaign)
+    delete_file_quiet(img.image)
+    img.delete()
     return ok({"campaign": campaign_dict(campaign, private=True)})
 
 

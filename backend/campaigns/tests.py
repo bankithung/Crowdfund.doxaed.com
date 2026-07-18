@@ -331,30 +331,51 @@ class ApiTestCase(TestCase):
         slug, pk = created["slug"], created["id"]
         self.assertEqual(created["fund_uses"], [])
 
+        # create a group with two photos at once
         added = self.client.post(f"/api/campaigns/{pk}/fund-uses/",
                                  {"heading": "Purchasing cabbage from farmers",
-                                  "image": png_upload("use1.png")})
+                                  "images": [png_upload("use1.png"), png_upload("use2.png")]})
         self.assertEqual(added.status_code, 201)
         self.client.post(f"/api/campaigns/{pk}/fund-uses/",
                          {"heading": "Transport to distribution points",
-                          "image": png_upload("use2.png")})
+                          "images": [png_upload("use3.png")]})
 
-        # public page shows the entries in order
+        # public page shows the groups in order, each with its images
         public = Client().get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]
         headings = [use["heading"] for use in public["fund_uses"]]
         self.assertEqual(headings, ["Purchasing cabbage from farmers",
                                     "Transport to distribution points"])
-        self.assertTrue(all(use["url"] for use in public["fund_uses"]))
+        self.assertEqual(len(public["fund_uses"][0]["images"]), 2)
+        self.assertTrue(all(img["url"] for use in public["fund_uses"]
+                            for img in use["images"]))
 
-        # validation: heading and image both required
+        # edit the heading; append another photo to the same group
+        use_id = public["fund_uses"][0]["id"]
+        edited = self.client.post(
+            f"/api/campaigns/{pk}/fund-uses/{use_id}/",
+            {"heading": "Buying cabbage directly from farmers",
+             "images": [png_upload("use4.png")]})
+        self.assertEqual(edited.status_code, 200)
+        group = edited.json()["data"]["campaign"]["fund_uses"][0]
+        self.assertEqual(group["heading"], "Buying cabbage directly from farmers")
+        self.assertEqual(len(group["images"]), 3)
+
+        # remove one photo from the group
+        img_id = group["images"][0]["id"]
+        trimmed = self.client.delete(
+            f"/api/campaigns/{pk}/fund-uses/{use_id}/images/{img_id}/")
+        self.assertEqual(trimmed.status_code, 200)
+        self.assertEqual(
+            len(trimmed.json()["data"]["campaign"]["fund_uses"][0]["images"]), 2)
+
+        # validation: heading and at least one image required on create
         bad = self.client.post(f"/api/campaigns/{pk}/fund-uses/", {"heading": "x"})
         self.assertEqual(bad.status_code, 400)
         fields = bad.json()["error"]["fields"]
         self.assertIn("heading", fields)
         self.assertIn("image", fields)
 
-        # delete one; other owners can't touch it
-        use_id = public["fund_uses"][0]["id"]
+        # other owners can't touch it; owner can delete the whole group
         other = Client()
         other.post("/api/auth/signup/",
                    {"name": "Other P", "email": "fu@example.com", "password": "str0ng-pass-123"},

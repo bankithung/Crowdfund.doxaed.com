@@ -534,18 +534,25 @@ const truncate = (text, n) => (text.length > n ? text.slice(0, n - 1) + '…' : 
 
 /* --------------------------------------------- how the money is used */
 
-/* Headed photos shown on the public page under the story — receipts of
-   the work itself: buying, transporting, distributing. */
+/* Headed photo groups shown on the public page under the story — receipts
+   of the work itself: buying, transporting, distributing. */
 function FundUsageCard({ campaign, onSaved }) {
   const toast = useToast()
   const [heading, setHeading] = useState('')
-  const [photo, setPhoto] = useState(null)
+  const [photos, setPhotos] = useState([])
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
-  const [removing, setRemoving] = useState(null)
+  const pickRef = useRef(null)
 
   const items = campaign.fund_uses || []
   const full = items.length >= 8
+
+  const pickPhotos = (fileList) => {
+    const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/'))
+    if (pickRef.current) pickRef.current.value = ''
+    if (!files.length) return
+    setPhotos((prev) => [...prev, ...files].slice(0, 6))
+  }
 
   const add = async (event) => {
     event.preventDefault()
@@ -553,31 +560,18 @@ function FundUsageCard({ campaign, onSaved }) {
     setErrors({})
     const body = new FormData()
     body.append('heading', heading)
-    if (photo) body.append('image', photo)
+    for (const photo of photos) body.append('images', photo)
     try {
       const data = await CampaignApi.addFundUse(campaign.id, body)
       onSaved(data.campaign, { silent: true })
       toast.success('Added — it’s on the public page')
       setHeading('')
-      setPhoto(null)
+      setPhotos([])
     } catch (err) {
       setErrors(err.fields || {})
       toast.error(err.message)
     } finally {
       setBusy(false)
-    }
-  }
-
-  const remove = async (itemId) => {
-    setRemoving(itemId)
-    try {
-      const data = await CampaignApi.removeFundUse(campaign.id, itemId)
-      onSaved(data.campaign, { silent: true })
-      toast.success('Removed')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setRemoving(null)
     }
   }
 
@@ -587,48 +581,159 @@ function FundUsageCard({ campaign, onSaved }) {
         <div>
           <h2 className="block-title">How the money is used</h2>
           <p className="section-sub">
-            Headed photos shown under your story — e.g. “Purchasing cabbage
-            from farmers” with a picture of the purchase.
+            Headed photo groups shown under your story — e.g. “Purchasing
+            cabbage from farmers” with pictures of the purchase.
           </p>
         </div>
       </div>
 
-      {items.length > 0 && (
-        <ul className="fund-use-list">
-          {items.map((item) => (
-            <li key={item.id} className="fund-use-row">
-              <img src={item.url} alt="" />
-              <strong>{item.heading}</strong>
-              <button className="icon-btn" onClick={() => remove(item.id)}
-                      disabled={removing === item.id}
-                      aria-label={`Remove “${item.heading}”`}>
-                {removing === item.id ? <Spinner size={13} /> : <Icon name="trash" size={14} />}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {items.map((item) => (
+        <FundUseRow key={item.id} item={item} campaign={campaign} onSaved={onSaved} />
+      ))}
 
       {full ? (
-        <p className="muted">Up to 8 items — remove one to add another.</p>
+        <p className="muted">Up to 8 headings — remove one to add another.</p>
       ) : (
         <form onSubmit={add} noValidate className="fund-use-form">
-          <Field label="Heading" required error={errors.heading}>
+          <Field label="New heading" required error={errors.heading}>
             <input className="input" value={heading} maxLength={120}
                    onChange={(e) => setHeading(e.target.value)}
                    placeholder="e.g. Purchasing cabbage from farmers" />
           </Field>
-          <ImageInput label="Photo" value={photo} onChange={setPhoto}
-                      error={errors.image} hint="Shown beside the heading." />
+          <div className="field">
+            <span className="field-label">Photos (up to 6)</span>
+            <div className="fund-use-picks">
+              {photos.map((file, index) => (
+                <span className="fund-use-pick" key={index}>
+                  <img src={URL.createObjectURL(file)} alt="" />
+                  <button type="button" className="fund-use-pick-x"
+                          aria-label="Remove this photo"
+                          onClick={() => setPhotos((p) => p.filter((_, i) => i !== index))}>
+                    <Icon name="x" size={11} />
+                  </button>
+                </span>
+              ))}
+              {photos.length < 6 && (
+                <button type="button" className="fund-use-pick-add"
+                        onClick={() => pickRef.current?.click()}>
+                  <Icon name="plus" size={16} />
+                  <span>Add photos</span>
+                </button>
+              )}
+            </div>
+            {errors.image && <span className="field-error">{errors.image}</span>}
+            <input ref={pickRef} type="file" accept="image/*" multiple hidden
+                   onChange={(e) => pickPhotos(e.target.files)} />
+          </div>
           <div className="form-nav">
             <span />
             <button type="submit" className="btn btn-primary"
-                    disabled={busy || !heading.trim() || !photo}>
-              {busy ? <Spinner size={14} /> : <><Icon name="plus" size={14} /> Add item</>}
+                    disabled={busy || !heading.trim() || photos.length === 0}>
+              {busy ? <Spinner size={14} /> : <><Icon name="plus" size={14} /> Add heading</>}
             </button>
           </div>
         </form>
       )}
+    </div>
+  )
+}
+
+function FundUseRow({ item, campaign, onSaved }) {
+  const toast = useToast()
+  const [editing, setEditing] = useState(false)
+  const [heading, setHeading] = useState(item.heading)
+  const [busy, setBusy] = useState(false)
+  const addRef = useRef(null)
+
+  const run = async (action, okMsg) => {
+    setBusy(true)
+    try {
+      const data = await action()
+      onSaved(data.campaign, { silent: true })
+      if (okMsg) toast.success(okMsg)
+      return true
+    } catch (err) {
+      toast.error(err.fields?.heading || err.fields?.image || err.message)
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveHeading = async () => {
+    const body = new FormData()
+    body.append('heading', heading)
+    if (await run(() => CampaignApi.updateFundUse(campaign.id, item.id, body),
+                  'Heading updated')) {
+      setEditing(false)
+    }
+  }
+
+  const addPhotos = async (fileList) => {
+    const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/'))
+    if (addRef.current) addRef.current.value = ''
+    if (!files.length) return
+    const body = new FormData()
+    for (const file of files) body.append('images', file)
+    run(() => CampaignApi.updateFundUse(campaign.id, item.id, body),
+        `Photo${files.length === 1 ? '' : 's'} added`)
+  }
+
+  return (
+    <div className="fund-use-group">
+      <div className="fund-use-head">
+        {editing ? (
+          <>
+            <input className="input" value={heading} maxLength={120} autoFocus
+                   onChange={(e) => setHeading(e.target.value)} />
+            <button className="btn btn-primary btn-sm" disabled={busy || !heading.trim()}
+                    onClick={saveHeading}>
+              {busy ? <Spinner size={13} /> : 'Save'}
+            </button>
+            <button className="btn btn-ghost btn-sm" disabled={busy}
+                    onClick={() => { setEditing(false); setHeading(item.heading) }}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <strong>{item.heading}</strong>
+            <button className="icon-btn" onClick={() => setEditing(true)}
+                    aria-label={`Edit heading “${item.heading}”`}>
+              <Icon name="edit" size={14} />
+            </button>
+            <button className="icon-btn" disabled={busy}
+                    onClick={() => run(() => CampaignApi.removeFundUse(campaign.id, item.id),
+                                       'Heading removed')}
+                    aria-label={`Remove “${item.heading}” and its photos`}>
+              {busy ? <Spinner size={13} /> : <Icon name="trash" size={14} />}
+            </button>
+          </>
+        )}
+      </div>
+      <div className="fund-use-thumbs">
+        {(item.images || []).map((img) => (
+          <span className="fund-use-pick" key={img.id}>
+            <img src={img.url} alt="" />
+            <button type="button" className="fund-use-pick-x" disabled={busy}
+                    aria-label="Remove this photo"
+                    onClick={() => run(
+                      () => CampaignApi.removeFundUseImage(campaign.id, item.id, img.id),
+                      'Photo removed')}>
+              <Icon name="x" size={11} />
+            </button>
+          </span>
+        ))}
+        {(item.images || []).length < 6 && (
+          <button type="button" className="fund-use-pick-add" disabled={busy}
+                  onClick={() => addRef.current?.click()}>
+            <Icon name="plus" size={16} />
+            <span>Add</span>
+          </button>
+        )}
+        <input ref={addRef} type="file" accept="image/*" multiple hidden
+               onChange={(e) => addPhotos(e.target.files)} />
+      </div>
     </div>
   )
 }

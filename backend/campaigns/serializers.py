@@ -143,8 +143,12 @@ def campaign_dict(campaign, *, private=False):
         "created_at": campaign.created_at.isoformat(),
         "share_url": share_url(campaign),
         "stats": campaign_counters(campaign),
-        "fund_uses": [{"id": use.pk, "heading": use.heading, "url": use.image.url}
-                      for use in campaign.fund_uses.all()],
+        "fund_uses": [
+            {"id": use.pk, "heading": use.heading,
+             "images": [{"id": img.pk, "url": img.image.url}
+                        for img in use.images.all()]}
+            for use in campaign.fund_uses.prefetch_related("images")
+        ],
     }
     data["impact"] = impact_dict(campaign, data["stats"]["raised"])
     if private:

@@ -180,19 +180,7 @@ export default function PublicCampaign() {
             </section>
 
             {(campaign.fund_uses || []).length > 0 && (
-              <section className="card pc-usage-card">
-                <span className="mini-label">
-                  <Icon name="wallet" size={12} /> How the money is used
-                </span>
-                <div className="pc-usage-grid">
-                  {campaign.fund_uses.map((use) => (
-                    <figure className="pc-usage-item" key={use.id}>
-                      <img src={use.url} alt={use.heading} loading="lazy" />
-                      <figcaption>{use.heading}</figcaption>
-                    </figure>
-                  ))}
-                </div>
-              </section>
+              <FundUsageSection fundUses={campaign.fund_uses} />
             )}
           </main>
 
@@ -400,6 +388,91 @@ export default function PublicCampaign() {
                      }
                    }} />
     </PublicShell>
+  )
+}
+
+/* ----------------------------------------- how the money is used */
+
+/* Headed photo groups. Tapping any photo opens a full-size lightbox
+   with prev/next inside the group. */
+function FundUsageSection({ fundUses }) {
+  const [lightbox, setLightbox] = useState(null)   // {use, index}
+
+  const move = useCallback((delta) => {
+    setLightbox((current) => {
+      if (!current) return current
+      const count = current.use.images.length
+      return { ...current, index: (current.index + delta + count) % count }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!lightbox) return
+    const onKey = (event) => {
+      if (event.key === 'Escape') setLightbox(null)
+      if (event.key === 'ArrowRight') move(1)
+      if (event.key === 'ArrowLeft') move(-1)
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [lightbox ? true : false, move])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <section className="card pc-usage-card">
+      <span className="mini-label">
+        <Icon name="wallet" size={12} /> How the money is used
+      </span>
+      {fundUses.map((use) => (
+        <div className="pc-usage-group" key={use.id}>
+          <h3 className="pc-usage-heading">{use.heading}</h3>
+          <div className="pc-usage-grid">
+            {(use.images || []).map((img, index) => (
+              <button type="button" className="pc-usage-thumb" key={img.id}
+                      onClick={() => setLightbox({ use, index })}
+                      aria-label={`View photo ${index + 1} of “${use.heading}” full-size`}>
+                <img src={img.url} alt={use.heading} loading="lazy" />
+                <span className="pc-usage-zoom"><Icon name="search" size={13} /></span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {lightbox && (
+        <div className="lightbox" onClick={() => setLightbox(null)} role="dialog"
+             aria-modal="true" aria-label={lightbox.use.heading}>
+          <button className="lightbox-x" aria-label="Close"
+                  onClick={() => setLightbox(null)}>
+            <Icon name="x" size={20} />
+          </button>
+          {lightbox.use.images.length > 1 && (
+            <button className="lightbox-nav lightbox-prev" aria-label="Previous photo"
+                    onClick={(e) => { e.stopPropagation(); move(-1) }}>
+              <Icon name="arrow-left" size={20} />
+            </button>
+          )}
+          <figure onClick={(e) => e.stopPropagation()}>
+            <img src={lightbox.use.images[lightbox.index].url}
+                 alt={lightbox.use.heading} />
+            <figcaption>
+              {lightbox.use.heading}
+              {lightbox.use.images.length > 1 &&
+                <span> · {lightbox.index + 1} / {lightbox.use.images.length}</span>}
+            </figcaption>
+          </figure>
+          {lightbox.use.images.length > 1 && (
+            <button className="lightbox-nav lightbox-next" aria-label="Next photo"
+                    onClick={(e) => { e.stopPropagation(); move(1) }}>
+              <Icon name="arrow-right" size={20} />
+            </button>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 
