@@ -325,6 +325,26 @@ class ApiTestCase(TestCase):
                             {"action": "reject"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
 
+    def test_ocr_amount_rupee_misread(self):
+        from campaigns.ocr import _pick_amount
+
+        # Google Pay screenshot: the big ₹500 loses its marker ("%500"),
+        # while '₹' in the detail rows merges into the digits → "2500".
+        text = ("Received from Ketou T\n18 Jul, 5:31pm\n%500\n"
+                "Transaction details\nPayment method UPI\n"
+                "UPI Transaction ID 619995438375\n"
+                "Google Transaction ID CICAgLjEoO2nFQ\n"
+                "Paid via Google Pay\nCustomer paid 2500\nAmount you get 2500\n")
+        self.assertEqual(_pick_amount(text, "619995438375"), "500")
+
+        # a genuine ₹2,500 payment is untouched
+        clean = "Customer paid ₹2,500\nAmount you get ₹2,500"
+        self.assertEqual(_pick_amount(clean, ""), "2500")
+
+        # decimals: ₹500.00 misread alongside a clean 500.00
+        decimals = "Amount paid 2500.00\nTotal ₹500.00"
+        self.assertEqual(_pick_amount(decimals, ""), "500.00")
+
     def test_fund_uses(self):
         self.signup()
         created = self.create_campaign().json()["data"]["campaign"]

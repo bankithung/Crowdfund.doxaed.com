@@ -63,22 +63,41 @@ def _amount_ok(token, utr):
     return 1 <= value <= 10_000_000
 
 
-def _pick_amount(text, utr):
-    for pattern in (_AMOUNT_MARKED, _AMOUNT_LABEL):
+def _candidate_amounts(text, utr):
+    """Every plausible amount seen, as (priority, token) — lower is better."""
+    found = []
+    for priority, pattern in ((0, _AMOUNT_MARKED), (1, _AMOUNT_LABEL)):
         for match in pattern.finditer(text):
             token = match.group(1)
             if _amount_ok(token, utr):
-                return token.replace(",", "")
+                found.append((priority, token.replace(",", "")))
     # amount displayed big on its own line (marker lost by OCR)
     for line in text.splitlines():
         match = _AMOUNT_LINE.match(line.strip())
         if match and _amount_ok(match.group(1), utr):
-            return match.group(1).replace(",", "")
+            found.append((2, match.group(1).replace(",", "")))
     # any decimal-bearing number (e.g. "500.00") anywhere
     for token in _NUM_TOKEN.findall(text):
         if _amount_ok(token, utr):
-            return token.replace(",", "")
-    return ""
+            found.append((3, token.replace(",", "")))
+    return found
+
+
+def _pick_amount(text, utr):
+    found = _candidate_amounts(text, utr)
+    if not found:
+        return ""
+    # '₹' glued to the digits OCRs as a leading '2' ("₹500" → "2500").
+    # UPI screenshots repeat the amount, so when BOTH 2X and X were read,
+    # X is the real amount — discard the 2X misreads.
+    values = {token.split(".")[0] for _, token in found}
+    misreads = {token for token in values
+                if token.startswith("2") and len(token) > 1
+                and token[1:].lstrip("0") and token[1:] in values}
+    cleaned = [(priority, token) for priority, token in found
+               if token.split(".")[0] not in misreads]
+    cleaned.sort(key=lambda item: item[0])
+    return cleaned[0][1] if cleaned else ""
 
 
 def parse_payment_screenshot(file_obj, exclude_vpas=()):
