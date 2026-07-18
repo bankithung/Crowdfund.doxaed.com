@@ -2482,9 +2482,8 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
     max-width: calc(100% - 440px);
   }
 
-  .pc-left .pc-wall { order: -1; }
-  /* the wall overlaps the hero image — give it a card surface so its
-     header stays readable */
+  /* story first, wall after — same reading order as on phones */
+  /* on hero pages the wall gets a card surface so its header stays readable */
   .pc-layout-overlap .pc-wall {
     background: var(--surface);
     border: 1px solid var(--line);
