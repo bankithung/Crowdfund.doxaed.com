@@ -2076,6 +2076,20 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 .pc-story-card { scroll-margin-top: 74px; }
 
+/* copy-a-link-to-this-section buttons on headings */
+.pc-anchor {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  border-radius: 50%;
+  color: var(--faint);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.pc-anchor:hover { color: var(--primary-strong); background: var(--primary-soft); }
+.block-title .pc-anchor { vertical-align: 1px; }
+
 /* jump chips under "Organized by" — Story · How the money is used */
 .pc-jumplinks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .pc-jumplinks button {

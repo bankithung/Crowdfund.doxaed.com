@@ -46,6 +46,19 @@ export default function PublicCampaign() {
 
   useEffect(() => { load() }, [load])
 
+  /* Deep link support: /c/<slug>#story etc. scrolls once the page has data. */
+  const jumpedRef = useRef(false)
+  useEffect(() => {
+    if (!campaign || jumpedRef.current) return
+    jumpedRef.current = true
+    const id = window.location.hash.slice(1)
+    if (!id) return
+    const timer = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [campaign])
+
   /* Live updates: while the tab is visible, refresh the stats, wall and
      ticker every 20s — new verifications land without a manual reload.
      Background refreshes are ?silent=1 so they don't inflate view counts. */
@@ -110,6 +123,19 @@ export default function PublicCampaign() {
     document.getElementById('money-use')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const scrollToStory = () =>
     document.getElementById('story')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  /* Sections are directly shareable: /c/<slug>#story, #money-use, #supporters.
+     The link buttons copy the deep link; opening one scrolls to the section. */
+  const copySectionLink = async (id) => {
+    const url = `${publicUrl(campaign.slug)}#${id}`
+    window.history.replaceState(null, '', `#${id}`)
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Section link copied — share it anywhere')
+    } catch {
+      toast.info(url)
+    }
+  }
 
   const gallery = (campaign.gallery || []).map((g) => g.url)
   const hasCover = gallery.length > 0
@@ -189,16 +215,25 @@ export default function PublicCampaign() {
             )}
 
             <section className="card pc-story-card" id="story">
-              <span className="mini-label">The story</span>
+              <span className="mini-label">
+                The story
+                <button className="pc-anchor" onClick={() => copySectionLink('story')}
+                        title="Copy a link to this section"
+                        aria-label="Copy a link to the story">
+                  <Icon name="link" size={11} />
+                </button>
+              </span>
               <MarkdownText text={campaign.description} className="pc-story-text" />
             </section>
 
             {(campaign.fund_uses || []).length > 0 && (
-              <FundUsageSection fundUses={campaign.fund_uses} />
+              <FundUsageSection fundUses={campaign.fund_uses}
+                                onCopyLink={() => copySectionLink('money-use')} />
             )}
           </main>
 
-          <SupporterWall campaign={campaign} refresh={liveTick} />
+          <SupporterWall campaign={campaign} refresh={liveTick}
+                         onCopyLink={() => copySectionLink('supporters')} />
         </div>
 
         {/* --------------------------------------------- payment rail */}
@@ -409,7 +444,7 @@ export default function PublicCampaign() {
 
 /* Headed photo groups. Tapping any photo opens a full-size lightbox
    with prev/next inside the group. */
-function FundUsageSection({ fundUses }) {
+function FundUsageSection({ fundUses, onCopyLink }) {
   const [lightbox, setLightbox] = useState(null)   // {use, index}
 
   const move = useCallback((delta) => {
@@ -439,6 +474,11 @@ function FundUsageSection({ fundUses }) {
     <section className="card pc-usage-card" id="money-use">
       <span className="mini-label">
         <Icon name="heart" size={12} /> Where your support goes
+        <button className="pc-anchor" onClick={onCopyLink}
+                title="Copy a link to this section"
+                aria-label="Copy a link to Where your support goes">
+          <Icon name="link" size={11} />
+        </button>
       </span>
       {fundUses.map((use) => (
         <div className="pc-usage-group" key={use.id}>
@@ -539,7 +579,7 @@ const WALL_SORTS = [
   { value: 'top', label: 'Top contributions' },
 ]
 
-function SupporterWall({ campaign, refresh }) {
+function SupporterWall({ campaign, refresh, onCopyLink }) {
   const [sort, setSort] = useState('recent')
   const [page, setPage] = useState(1)
   const [data, setData] = useState(null)
@@ -560,6 +600,11 @@ function SupporterWall({ campaign, refresh }) {
           <h2 className="block-title">
             Supporter wall
             {data && <span className="wall-count">{data.meta.total}</span>}
+            <button className="pc-anchor" onClick={onCopyLink}
+                    title="Copy a link to this section"
+                    aria-label="Copy a link to the supporter wall">
+              <Icon name="link" size={12} />
+            </button>
           </h2>
           <p className="section-sub">Manually verified by the organizer</p>
         </div>
