@@ -532,6 +532,107 @@ const truncate = (text, n) => (text.length > n ? text.slice(0, n - 1) + '…' : 
 
 /* -------------------------------------------------------------- settings */
 
+/* --------------------------------------------- how the money is used */
+
+/* Headed photos shown on the public page under the story — receipts of
+   the work itself: buying, transporting, distributing. */
+function FundUsageCard({ campaign, onSaved }) {
+  const toast = useToast()
+  const [heading, setHeading] = useState('')
+  const [photo, setPhoto] = useState(null)
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState(null)
+
+  const items = campaign.fund_uses || []
+  const full = items.length >= 8
+
+  const add = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setErrors({})
+    const body = new FormData()
+    body.append('heading', heading)
+    if (photo) body.append('image', photo)
+    try {
+      const data = await CampaignApi.addFundUse(campaign.id, body)
+      onSaved(data.campaign, { silent: true })
+      toast.success('Added — it’s on the public page')
+      setHeading('')
+      setPhoto(null)
+    } catch (err) {
+      setErrors(err.fields || {})
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (itemId) => {
+    setRemoving(itemId)
+    try {
+      const data = await CampaignApi.removeFundUse(campaign.id, itemId)
+      onSaved(data.campaign, { silent: true })
+      toast.success('Removed')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="section-head">
+        <div>
+          <h2 className="block-title">How the money is used</h2>
+          <p className="section-sub">
+            Headed photos shown under your story — e.g. “Purchasing cabbage
+            from farmers” with a picture of the purchase.
+          </p>
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <ul className="fund-use-list">
+          {items.map((item) => (
+            <li key={item.id} className="fund-use-row">
+              <img src={item.url} alt="" />
+              <strong>{item.heading}</strong>
+              <button className="icon-btn" onClick={() => remove(item.id)}
+                      disabled={removing === item.id}
+                      aria-label={`Remove “${item.heading}”`}>
+                {removing === item.id ? <Spinner size={13} /> : <Icon name="trash" size={14} />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {full ? (
+        <p className="muted">Up to 8 items — remove one to add another.</p>
+      ) : (
+        <form onSubmit={add} noValidate className="fund-use-form">
+          <Field label="Heading" required error={errors.heading}>
+            <input className="input" value={heading} maxLength={120}
+                   onChange={(e) => setHeading(e.target.value)}
+                   placeholder="e.g. Purchasing cabbage from farmers" />
+          </Field>
+          <ImageInput label="Photo" value={photo} onChange={setPhoto}
+                      error={errors.image} hint="Shown beside the heading." />
+          <div className="form-nav">
+            <span />
+            <button type="submit" className="btn btn-primary"
+                    disabled={busy || !heading.trim() || !photo}>
+              {busy ? <Spinner size={14} /> : <><Icon name="plus" size={14} /> Add item</>}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 /* ------------------------------------------------------ impact settings */
 
 const IMPACT_MODES = [
@@ -860,6 +961,8 @@ function SettingsSummary({ campaign, onEdit, onSaved }) {
       </div>
 
       <GalleryCard campaign={campaign} onSaved={onSaved} />
+
+      <FundUsageCard campaign={campaign} onSaved={onSaved} />
 
       <ImpactSettingsCard key={`impact-${campaign.id}`} campaign={campaign}
                           onSaved={onSaved} />

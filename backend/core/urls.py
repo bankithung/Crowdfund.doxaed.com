@@ -22,6 +22,8 @@ urlpatterns = [
     path("api/campaigns/<int:pk>/", camp.campaign_detail_view),
     path("api/campaigns/<int:pk>/images/", camp.campaign_images_view),
     path("api/campaigns/<int:pk>/images/<int:image_id>/", camp.campaign_image_delete_view),
+    path("api/campaigns/<int:pk>/fund-uses/", camp.fund_use_add_view),
+    path("api/campaigns/<int:pk>/fund-uses/<int:item_id>/", camp.fund_use_delete_view),
     path("api/campaigns/<int:pk>/donations/", camp.campaign_donations_view),
     path("api/campaigns/<int:pk>/analytics/", camp.campaign_analytics_view),
     path("api/campaigns/<int:pk>/export/", camp.campaign_export_view),

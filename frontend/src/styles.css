@@ -2063,6 +2063,57 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   .pc-marquee { overflow-x: auto; }
 }
 
+/* "how the money is used" — public section + settings list */
+.pc-usage-card { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
+.pc-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+.pc-usage-item { margin: 0; }
+.pc-usage-item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  display: block;
+}
+.pc-usage-item figcaption {
+  margin-top: 8px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: 1.4;
+}
+@media (max-width: 720px) {
+  .pc-usage-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+
+.fund-use-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+.fund-use-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.fund-use-row:last-child { border-bottom: none; }
+.fund-use-row img {
+  width: 52px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.fund-use-row strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-13); }
+.fund-use-form { display: flex; flex-direction: column; gap: 12px; }
+
 /* funds | impact segmented toggle */
 .pc-view-toggle {
   display: flex;

@@ -325,6 +325,46 @@ class ApiTestCase(TestCase):
                             {"action": "reject"}, content_type="application/json")
         self.assertEqual(denied.status_code, 404)
 
+    def test_fund_uses(self):
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug, pk = created["slug"], created["id"]
+        self.assertEqual(created["fund_uses"], [])
+
+        added = self.client.post(f"/api/campaigns/{pk}/fund-uses/",
+                                 {"heading": "Purchasing cabbage from farmers",
+                                  "image": png_upload("use1.png")})
+        self.assertEqual(added.status_code, 201)
+        self.client.post(f"/api/campaigns/{pk}/fund-uses/",
+                         {"heading": "Transport to distribution points",
+                          "image": png_upload("use2.png")})
+
+        # public page shows the entries in order
+        public = Client().get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]
+        headings = [use["heading"] for use in public["fund_uses"]]
+        self.assertEqual(headings, ["Purchasing cabbage from farmers",
+                                    "Transport to distribution points"])
+        self.assertTrue(all(use["url"] for use in public["fund_uses"]))
+
+        # validation: heading and image both required
+        bad = self.client.post(f"/api/campaigns/{pk}/fund-uses/", {"heading": "x"})
+        self.assertEqual(bad.status_code, 400)
+        fields = bad.json()["error"]["fields"]
+        self.assertIn("heading", fields)
+        self.assertIn("image", fields)
+
+        # delete one; other owners can't touch it
+        use_id = public["fund_uses"][0]["id"]
+        other = Client()
+        other.post("/api/auth/signup/",
+                   {"name": "Other P", "email": "fu@example.com", "password": "str0ng-pass-123"},
+                   content_type="application/json")
+        self.assertEqual(
+            other.delete(f"/api/campaigns/{pk}/fund-uses/{use_id}/").status_code, 404)
+        gone = self.client.delete(f"/api/campaigns/{pk}/fund-uses/{use_id}/")
+        self.assertEqual(gone.status_code, 200)
+        self.assertEqual(len(gone.json()["data"]["campaign"]["fund_uses"]), 1)
+
     def test_impact_tracking(self):
         self.signup()
         created = self.create_campaign().json()["data"]["campaign"]

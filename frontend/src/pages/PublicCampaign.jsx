@@ -178,6 +178,22 @@ export default function PublicCampaign() {
               <span className="mini-label">The story</span>
               <MarkdownText text={campaign.description} className="pc-story-text" />
             </section>
+
+            {(campaign.fund_uses || []).length > 0 && (
+              <section className="card pc-usage-card">
+                <span className="mini-label">
+                  <Icon name="wallet" size={12} /> How the money is used
+                </span>
+                <div className="pc-usage-grid">
+                  {campaign.fund_uses.map((use) => (
+                    <figure className="pc-usage-item" key={use.id}>
+                      <img src={use.url} alt={use.heading} loading="lazy" />
+                      <figcaption>{use.heading}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            )}
           </main>
 
           <SupporterWall campaign={campaign} refresh={liveTick} />

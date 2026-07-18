@@ -130,6 +130,24 @@ class CampaignImage(models.Model):
         return f"image {self.pk} of campaign {self.campaign_id}"
 
 
+class FundUse(models.Model):
+    """'How the money is used' entries — a heading with a photo each,
+    shown on the public page under the story."""
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE,
+                                 related_name="fund_uses")
+    heading = models.CharField(max_length=120)
+    image = models.ImageField(upload_to=cover_upload_path)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return f"{self.campaign_id}: {self.heading}"
+
+
 class Donation(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),

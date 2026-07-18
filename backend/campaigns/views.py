@@ -21,7 +21,7 @@ from core.api import (BodyError, as_bool, err, methods, ok, paginate,
 
 from .images import (ImageError, decode_qr_payload, delete_file_quiet,
                      process_image)
-from .models import Campaign, CampaignImage, Donation
+from .models import Campaign, CampaignImage, Donation, FundUse
 from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
 from .validators import (DONATION_MAX, DONATION_MIN, PHONE_RE, TXN_REF_RE,
@@ -150,6 +150,8 @@ def campaign_detail_view(request, pk):
             delete_file_quiet(donation.screenshot)
         for extra in campaign.images.all():
             delete_file_quiet(extra.image)
+        for use in campaign.fund_uses.all():
+            delete_file_quiet(use.image)
         delete_file_quiet(campaign.qr_code)
         delete_file_quiet(campaign.cover_image)
         log.info("campaign deleted id=%s owner=%s", campaign.pk, request.user.pk)
@@ -270,6 +272,58 @@ def campaign_images_view(request, pk):
 def campaign_image_delete_view(request, pk, image_id):
     campaign = get_owned_campaign(request, pk)
     item = get_object_or_404(CampaignImage, pk=image_id, campaign=campaign)
+    delete_file_quiet(item.image)
+    item.delete()
+    return ok({"campaign": campaign_dict(campaign, private=True)})
+
+
+# ------------------------------------------------ how the money is used
+
+MAX_FUND_USES = 8
+
+
+@methods("POST")
+@require_login
+def fund_use_add_view(request, pk):
+    """Add a 'how the money is used' entry: heading + photo."""
+    campaign = get_owned_campaign(request, pk)
+    if campaign.fund_uses.count() >= MAX_FUND_USES:
+        return err(f"Up to {MAX_FUND_USES} items — remove one to add another.",
+                   400, "validation")
+
+    errors = {}
+    heading = str(request.POST.get("heading") or "").strip()
+    if not 3 <= len(heading) <= 120:
+        errors["heading"] = "Heading should be 3–120 characters."
+
+    content = None
+    upload = request.FILES.get("image")
+    if not upload:
+        errors["image"] = "Add a photo for this item."
+    else:
+        try:
+            content, _ = process_image(upload, max_dim=2000, force="jpeg")
+        except ImageError as exc:
+            errors["image"] = str(exc)
+
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation",
+                   fields=errors)
+
+    last = campaign.fund_uses.order_by("-position").first()
+    item = FundUse(campaign=campaign, heading=heading,
+                   position=(last.position + 1) if last else 1)
+    item.image.save(content.name, content, save=False)
+    item.save()
+    log.info("fund-use added id=%s campaign=%s", item.pk, campaign.pk)
+    return ok({"campaign": campaign_dict(campaign, private=True)}, status=201)
+
+
+@methods("DELETE")
+@require_login
+def fund_use_delete_view(request, pk, item_id):
+    campaign = get_owned_campaign(request, pk)
+    item = get_object_or_404(FundUse, pk=item_id, campaign=campaign)
     delete_file_quiet(item.image)
     item.delete()
     return ok({"campaign": campaign_dict(campaign, private=True)})
