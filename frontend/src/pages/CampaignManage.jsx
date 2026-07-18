@@ -147,7 +147,8 @@ export default function CampaignManage() {
                          onStatsChange(stats)
                          setListVersion((v) => v + 1)
                        }} />
-          <EditModal donation={editing} onClose={() => setEditing(null)}
+          <EditModal donation={editing} campaignSlug={campaign.slug}
+                     onClose={() => setEditing(null)}
                      onDone={(stats) => {
                        setEditing(null)
                        onStatsChange(stats)
@@ -1508,7 +1509,7 @@ function ClaimFieldset({ form, set, errors }) {
 
 /* Fix a claim after submission — a mistaken anonymous tick, a name typo,
    a wrong amount. Status and proof screenshot stay read-only. */
-function EditModal({ donation, onClose, onDone }) {
+function EditModal({ donation, campaignSlug, onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_CLAIM)
   const [newShot, setNewShot] = useState(null)   // added/replacement screenshot
@@ -1534,10 +1535,50 @@ function EditModal({ donation, onClose, onDone }) {
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
 
+  /* OCR a screenshot (new pick or the stored proof) and fill whatever the
+     organizer hasn't typed yet — never overwrites a non-empty field. */
+  const [scanning, setScanning] = useState(false)
+  const [scanned, setScanned] = useState(false)
+  const extractFrom = (file) => {
+    setScanning(true)
+    setScanned(false)
+    const body = new FormData()
+    body.append('screenshot', file)
+    if (campaignSlug) body.append('slug', campaignSlug)
+    PublicApi.parseScreenshot(body)
+      .then(({ detected }) => {
+        const found = detected.transaction_ref || detected.amount || detected.payer_name
+        setForm((f) => ({
+          ...f,
+          donor_name: f.donor_name || detected.payer_name || '',
+          amount: f.amount || detected.amount || '',
+          transaction_ref: f.transaction_ref || detected.transaction_ref || '',
+          payer_id: f.payer_id || detected.payer_id || '',
+        }))
+        setScanned(!!found)
+        if (!found) toast.info('Could not read details from this screenshot.')
+      })
+      .catch((err) => toast.error(err.message))
+      .finally(() => setScanning(false))
+  }
+
+  const fillFromScreenshot = async () => {
+    if (newShot) return extractFrom(newShot)
+    try {
+      const blob = await (await fetch(donation.proof_url)).blob()
+      extractFrom(new File([blob], 'proof.jpg', { type: blob.type || 'image/jpeg' }))
+    } catch {
+      toast.error('Could not load the stored screenshot.')
+    }
+  }
+
   const pickShot = (fileList) => {
     const file = [...(fileList || [])].find((f) => f.type.startsWith('image/'))
     if (shotRef.current) shotRef.current.value = ''
-    if (file) setNewShot(file)
+    if (file) {
+      setNewShot(file)
+      extractFrom(file)
+    }
   }
 
   const save = async (event) => {
@@ -1612,6 +1653,18 @@ function EditModal({ donation, onClose, onDone }) {
                   ? 'New screenshot selected — saves with the claim'
                   : donation.has_screenshot ? 'Replace screenshot' : 'Add screenshot'}
               </button>
+              {(donation.has_screenshot || newShot) && (
+                <button type="button" className="claim-proof-open" disabled={scanning}
+                        onClick={fillFromScreenshot}>
+                  <Icon name="zap" size={12} />
+                  {scanning ? 'Reading screenshot…' : 'Fill details from screenshot'}
+                </button>
+              )}
+              {scanned && !scanning && (
+                <span className="ocr-note ocr-ok">
+                  <Icon name="check-circle" size={12} /> Empty fields filled — please verify.
+                </span>
+              )}
               {errors.screenshot && <span className="field-error">{errors.screenshot}</span>}
               <input ref={shotRef} type="file" accept="image/*" hidden
                      onChange={(e) => pickShot(e.target.files)} />
