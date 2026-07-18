@@ -2512,6 +2512,7 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 .wall-avatar {
   display: grid;
   place-items: center;
+  flex-shrink: 0;   /* long names must not squash the circle into an oval */
   width: 27px;
   height: 27px;
   border-radius: 50%;
