@@ -151,6 +151,7 @@ class FundUseImage(models.Model):
     fund_use = models.ForeignKey(FundUse, on_delete=models.CASCADE,
                                  related_name="images")
     image = models.ImageField(upload_to=cover_upload_path)
+    caption = models.CharField(max_length=160, blank=True, default="")
     position = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

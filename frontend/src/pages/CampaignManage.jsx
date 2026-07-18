@@ -645,6 +645,7 @@ function FundUseRow({ item, campaign, onSaved }) {
   const [editing, setEditing] = useState(false)
   const [heading, setHeading] = useState(item.heading)
   const [busy, setBusy] = useState(false)
+  const [captioning, setCaptioning] = useState(null)   // {id, caption} being edited
   const addRef = useRef(null)
 
   const run = async (action, okMsg) => {
@@ -715,8 +716,17 @@ function FundUseRow({ item, campaign, onSaved }) {
       </div>
       <div className="fund-use-thumbs">
         {(item.images || []).map((img) => (
-          <span className="fund-use-pick" key={img.id}>
-            <img src={img.url} alt="" />
+          <span className={`fund-use-pick ${captioning?.id === img.id ? 'is-captioning' : ''}`}
+                key={img.id}>
+            <button type="button" className="fund-use-pick-img" disabled={busy}
+                    title={img.caption || 'Add a caption'}
+                    aria-label={img.caption ? `Edit caption: ${img.caption}` : 'Add a caption'}
+                    onClick={() => setCaptioning(
+                      captioning?.id === img.id ? null
+                        : { id: img.id, caption: img.caption || '' })}>
+              <img src={img.url} alt={img.caption || ''} />
+              {img.caption && <span className="fund-use-capdot"><Icon name="format-quote" size={9} /></span>}
+            </button>
             <button type="button" className="fund-use-pick-x" disabled={busy}
                     aria-label="Remove this photo"
                     onClick={() => run(
@@ -736,6 +746,28 @@ function FundUseRow({ item, campaign, onSaved }) {
         <input ref={addRef} type="file" accept="image/*" multiple hidden
                onChange={(e) => addPhotos(e.target.files)} />
       </div>
+
+      {captioning && (
+        <div className="fund-use-caption-edit">
+          <input className="input" value={captioning.caption} maxLength={160} autoFocus
+                 placeholder={`Caption for this photo (blank = “${item.heading}”)`}
+                 onChange={(e) => setCaptioning((c) => ({ ...c, caption: e.target.value }))} />
+          <button className="btn btn-primary btn-sm" disabled={busy}
+                  onClick={async () => {
+                    const body = new FormData()
+                    body.append('caption', captioning.caption)
+                    if (await run(
+                      () => CampaignApi.setFundUseCaption(campaign.id, item.id, captioning.id, body),
+                      'Caption saved')) setCaptioning(null)
+                  }}>
+            {busy ? <Spinner size={13} /> : 'Save'}
+          </button>
+          <button className="btn btn-ghost btn-sm" disabled={busy}
+                  onClick={() => setCaptioning(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   )
 }

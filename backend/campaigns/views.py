@@ -382,14 +382,25 @@ def fund_use_detail_view(request, pk, item_id):
     return ok({"campaign": campaign_dict(campaign, private=True)})
 
 
-@methods("DELETE")
+@methods("POST", "DELETE")
 @require_login
-def fund_use_image_delete_view(request, pk, item_id, image_id):
+def fund_use_image_view(request, pk, item_id, image_id):
+    """POST sets the photo's caption; DELETE removes the photo."""
     campaign = get_owned_campaign(request, pk)
     img = get_object_or_404(FundUseImage, pk=image_id, fund_use_id=item_id,
                             fund_use__campaign=campaign)
-    delete_file_quiet(img.image)
-    img.delete()
+
+    if request.method == "DELETE":
+        delete_file_quiet(img.image)
+        img.delete()
+        return ok({"campaign": campaign_dict(campaign, private=True)})
+
+    caption = str(request.POST.get("caption") or "").strip()
+    if len(caption) > 160:
+        return err("Please fix the highlighted fields.", 400, "validation",
+                   fields={"caption": "Caption must be at most 160 characters."})
+    img.caption = caption
+    img.save(update_fields=["caption"])
     return ok({"campaign": campaign_dict(campaign, private=True)})
 
 

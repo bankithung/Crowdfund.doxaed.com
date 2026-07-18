@@ -145,7 +145,8 @@ def campaign_dict(campaign, *, private=False):
         "stats": campaign_counters(campaign),
         "fund_uses": [
             {"id": use.pk, "heading": use.heading,
-             "images": [{"id": img.pk, "url": img.image.url}
+             "images": [{"id": img.pk, "url": img.image.url,
+                         "caption": img.caption}
                         for img in use.images.all()]}
             for use in campaign.fund_uses.prefetch_related("images")
         ],

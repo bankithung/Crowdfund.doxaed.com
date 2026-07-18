@@ -445,12 +445,15 @@ function FundUsageSection({ fundUses }) {
           <h3 className="pc-usage-heading">{use.heading}</h3>
           <div className="pc-usage-grid">
             {(use.images || []).map((img, index) => (
-              <button type="button" className="pc-usage-thumb" key={img.id}
-                      onClick={() => setLightbox({ use, index })}
-                      aria-label={`View photo ${index + 1} of “${use.heading}” full-size`}>
-                <img src={img.url} alt={use.heading} loading="lazy" />
-                <span className="pc-usage-zoom"><Icon name="search" size={13} /></span>
-              </button>
+              <figure className="pc-usage-cell" key={img.id}>
+                <button type="button" className="pc-usage-thumb"
+                        onClick={() => setLightbox({ use, index })}
+                        aria-label={`View “${img.caption || use.heading}” full-size`}>
+                  <img src={img.url} alt={img.caption || use.heading} loading="lazy" />
+                  <span className="pc-usage-zoom"><Icon name="search" size={13} /></span>
+                </button>
+                {img.caption && <figcaption>{img.caption}</figcaption>}
+              </figure>
             ))}
           </div>
         </div>
@@ -473,7 +476,7 @@ function FundUsageSection({ fundUses }) {
             <img src={lightbox.use.images[lightbox.index].url}
                  alt={lightbox.use.heading} />
             <figcaption>
-              {lightbox.use.heading}
+              {lightbox.use.images[lightbox.index].caption || lightbox.use.heading}
               {lightbox.use.images.length > 1 &&
                 <span> · {lightbox.index + 1} / {lightbox.use.images.length}</span>}
             </figcaption>

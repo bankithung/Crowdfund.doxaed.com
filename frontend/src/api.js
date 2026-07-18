@@ -91,6 +91,8 @@ export const CampaignApi = {
     api(`/api/campaigns/${id}/fund-uses/${itemId}/`, { method: 'DELETE' }),
   removeFundUseImage: (id, itemId, imageId) =>
     api(`/api/campaigns/${id}/fund-uses/${itemId}/images/${imageId}/`, { method: 'DELETE' }),
+  setFundUseCaption: (id, itemId, imageId, form) =>
+    api(`/api/campaigns/${id}/fund-uses/${itemId}/images/${imageId}/`, { method: 'POST', form }),
   exportUrl: (id) => `/api/campaigns/${id}/export/`,
 }
 

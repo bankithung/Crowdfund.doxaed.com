@@ -368,6 +368,20 @@ class ApiTestCase(TestCase):
         self.assertEqual(
             len(trimmed.json()["data"]["campaign"]["fund_uses"][0]["images"]), 2)
 
+        # caption a photo — the public payload carries it
+        img_id2 = trimmed.json()["data"]["campaign"]["fund_uses"][0]["images"][0]["id"]
+        capped = self.client.post(
+            f"/api/campaigns/{pk}/fund-uses/{use_id}/images/{img_id2}/",
+            {"caption": "Loading at the Razeba collection point"})
+        self.assertEqual(capped.status_code, 200)
+        public2 = Client().get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]
+        self.assertEqual(public2["fund_uses"][0]["images"][0]["caption"],
+                         "Loading at the Razeba collection point")
+        too_long = self.client.post(
+            f"/api/campaigns/{pk}/fund-uses/{use_id}/images/{img_id2}/",
+            {"caption": "x" * 200})
+        self.assertEqual(too_long.status_code, 400)
+
         # validation: heading and at least one image required on create
         bad = self.client.post(f"/api/campaigns/{pk}/fund-uses/", {"heading": "x"})
         self.assertEqual(bad.status_code, 400)
