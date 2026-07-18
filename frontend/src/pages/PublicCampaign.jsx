@@ -106,6 +106,8 @@ export default function PublicCampaign() {
     document.getElementById('pay')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const scrollToWall = () =>
     document.getElementById('supporters')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scrollToUsage = () =>
+    document.getElementById('money-use')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   const gallery = (campaign.gallery || []).map((g) => g.url)
   const hasCover = gallery.length > 0
@@ -175,7 +177,15 @@ export default function PublicCampaign() {
             )}
 
             <section className="card pc-story-card">
-              <span className="mini-label">The story</span>
+              <div className="pc-story-head">
+                <span className="mini-label">The story</span>
+                {(campaign.fund_uses || []).length > 0 && (
+                  <button className="pc-usage-link" onClick={scrollToUsage}>
+                    <Icon name="wallet" size={12} /> How the money is used
+                    <Icon name="chevron-down" size={12} />
+                  </button>
+                )}
+              </div>
               <MarkdownText text={campaign.description} className="pc-story-text" />
             </section>
 
@@ -422,7 +432,7 @@ function FundUsageSection({ fundUses }) {
   }, [lightbox ? true : false, move])   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section className="card pc-usage-card">
+    <section className="card pc-usage-card" id="money-use">
       <span className="mini-label">
         <Icon name="wallet" size={12} /> How the money is used
       </span>

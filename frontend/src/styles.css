@@ -2064,7 +2064,31 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 }
 
 /* "how the money is used" — public section */
-.pc-usage-card { margin-top: 24px; display: flex; flex-direction: column; gap: 18px; }
+.pc-usage-card {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scroll-margin-top: 74px;
+}
+.pc-story-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pc-story-head .mini-label { margin-bottom: 0; }
+.pc-usage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--primary-strong);
+}
+.pc-usage-link:hover { text-decoration: underline; }
 .pc-usage-group { display: flex; flex-direction: column; gap: 10px; }
 .pc-usage-heading { font-size: var(--fs-15); font-weight: 700; line-height: 1.4; }
 .pc-usage-grid {
