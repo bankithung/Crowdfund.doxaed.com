@@ -15,7 +15,7 @@ import { Select } from '../components/Select.jsx'
 import { ShareRow } from '../components/ShareRow.jsx'
 import { PublicShell } from '../components/Shells.jsx'
 import { useToast } from '../ctx/ToastContext.jsx'
-import { inr, publicUrl, shortDate, timeAgo } from '../format.js'
+import { dateTime, inr, publicUrl, shortDate, timeAgo } from '../format.js'
 
 /* The organizer's UPI ID — explicit field first, else parsed from the QR payload. */
 function effectiveUpiId(campaign) {
@@ -965,9 +965,9 @@ function StatusModal({ open, initialRef, onClose }) {
             <dl className="csc-rows">
               <div><dt>From</dt><dd>{result.donor_name}</dd></div>
               <div><dt>To</dt><dd>“{result.campaign_title}”</dd></div>
-              <div><dt>Submitted</dt><dd>{timeAgo(result.created_at)}</dd></div>
+              <div><dt>Submitted</dt><dd>{dateTime(result.created_at)}</dd></div>
               {result.reviewed_at && (
-                <div><dt>Reviewed</dt><dd>{timeAgo(result.reviewed_at)}</dd></div>
+                <div><dt>Reviewed</dt><dd>{dateTime(result.reviewed_at)}</dd></div>
               )}
               <div><dt>Reference</dt><dd>{result.public_id}</dd></div>
             </dl>
