@@ -446,6 +446,17 @@ def _add_manual_donation(request, campaign):
         return err(str(exc), 400, "bad_body")
 
     cleaned, errors = clean_donation_fields(data)
+
+    # optional payment screenshot (e.g. forwarded on WhatsApp) — stored as
+    # proof exactly like a supporter-submitted one
+    screenshot_content = None
+    if request.FILES.get("screenshot"):
+        try:
+            screenshot_content, _ = process_image(request.FILES["screenshot"],
+                                                  max_dim=2000, force="auto")
+        except ImageError as exc:
+            errors["screenshot"] = str(exc)
+
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation",
                    fields=errors)
@@ -463,6 +474,9 @@ def _add_manual_donation(request, campaign):
         status="confirmed",
         reviewed_at=timezone.now(),
     )
+    if screenshot_content:
+        donation.screenshot.save(screenshot_content.name, screenshot_content,
+                                 save=False)
     donation.save()
     log.info("manual donation added id=%s campaign=%s amount=%s owner=%s",
              donation.pk, campaign.pk, donation.amount, request.user.pk)

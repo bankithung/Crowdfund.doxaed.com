@@ -153,7 +153,8 @@ export default function CampaignManage() {
                        onStatsChange(stats)
                        setListVersion((v) => v + 1)
                      }} />
-          <AddModal campaignId={campaign.id} open={adding} onClose={() => setAdding(false)}
+          <AddModal campaignId={campaign.id} campaignSlug={campaign.slug}
+                    open={adding} onClose={() => setAdding(false)}
                     onDone={(stats) => {
                       setAdding(false)
                       onStatsChange(stats)
@@ -1605,27 +1606,68 @@ function EditModal({ donation, onClose, onDone }) {
 
 /* Record a payment that arrived without a claim — cash, a direct transfer,
    a supporter who never submitted proof. Goes on the wall immediately. */
-function AddModal({ campaignId, open, onClose, onDone }) {
+function AddModal({ campaignId, campaignSlug, open, onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_CLAIM)
+  const [screenshot, setScreenshot] = useState(null)
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [scanned, setScanned] = useState(false)
 
-  useEffect(() => { if (open) { setForm(EMPTY_CLAIM); setErrors({}) } }, [open])
+  useEffect(() => {
+    if (open) {
+      setForm(EMPTY_CLAIM)
+      setScreenshot(null)
+      setScanned(false)
+      setErrors({})
+    }
+  }, [open])
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+
+  /* OCR the screenshot and prefill whatever the organizer hasn't typed —
+     same extraction the public claim form uses. */
+  const onScreenshot = (file) => {
+    setScreenshot(file)
+    setScanned(false)
+    if (!file) return
+    setScanning(true)
+    const body = new FormData()
+    body.append('screenshot', file)
+    if (campaignSlug) body.append('slug', campaignSlug)
+    PublicApi.parseScreenshot(body)
+      .then(({ detected }) => {
+        const found = detected.transaction_ref || detected.amount || detected.payer_name
+        setForm((f) => ({
+          ...f,
+          donor_name: f.donor_name || detected.payer_name || '',
+          transaction_ref: f.transaction_ref || detected.transaction_ref || '',
+          amount: f.amount || detected.amount || '',
+          payer_id: f.payer_id || detected.payer_id || '',
+        }))
+        setScanned(!!found)
+      })
+      .catch(() => {})
+      .finally(() => setScanning(false))
+  }
 
   const save = async (event) => {
     event.preventDefault()
     setBusy(true)
     setErrors({})
+    const body = new FormData()
+    for (const [key, value] of Object.entries(form)) {
+      body.append(key, typeof value === 'boolean' ? (value ? 'true' : 'false') : value)
+    }
+    if (screenshot) body.append('screenshot', screenshot)
     try {
-      const data = await CampaignApi.addDonation(campaignId, form)
+      const data = await CampaignApi.addDonation(campaignId, body)
       toast.success(`Recorded ${inr(data.donation.amount)} from ${data.donation.donor_name}`)
       onDone(data.campaign_stats)
     } catch (err) {
       setErrors(err.fields || {})
-      if (!err.fields) toast.error(err.message)
+      toast.error(err.message)
     } finally {
       setBusy(false)
     }
@@ -1635,6 +1677,17 @@ function AddModal({ campaignId, open, onClose, onDone }) {
     <Modal open={open} onClose={onClose} title="Record a contribution"
            subtitle="For payments you received without a claim — added as verified, straight onto the wall.">
       <form onSubmit={save} noValidate>
+        <ImageInput label="Payment screenshot (optional)" value={screenshot}
+                    onChange={onScreenshot} error={errors.screenshot}
+                    hint="Details fill in automatically from the screenshot." />
+        {scanning && (
+          <p className="ocr-note"><Spinner size={12} /> Reading screenshot…</p>
+        )}
+        {scanned && !scanning && (
+          <p className="ocr-note ocr-ok">
+            <Icon name="check-circle" size={13} /> Details filled — please verify.
+          </p>
+        )}
         <ClaimFieldset form={form} set={set} errors={errors} />
         <div className="form-nav">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>

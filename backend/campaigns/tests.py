@@ -590,6 +590,16 @@ class ApiTestCase(TestCase):
         self.assertEqual(wall["meta"]["total"], 1)
         self.assertEqual(wall["donors"][0]["name"], "Abeio kire")
 
+        # multipart with a screenshot works too — stored as proof
+        with_shot = self.client.post(
+            f"/api/campaigns/{pk}/donations/",
+            {"donor_name": "Manual With Proof", "amount": "750",
+             "screenshot": png_upload("manual-proof.png")})
+        self.assertEqual(with_shot.status_code, 201)
+        self.assertTrue(with_shot.json()["data"]["donation"]["has_screenshot"])
+        proof = Donation.objects.get(donor_name="Manual With Proof")
+        self.assertTrue(proof.screenshot.name.startswith("proofs/"))
+
         # validation still applies; no transaction ref/screenshot required
         bad = self.client.post(f"/api/campaigns/{pk}/donations/",
                                {"donor_name": "X", "amount": "0"},
