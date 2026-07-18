@@ -2071,24 +2071,34 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   gap: 18px;
   scroll-margin-top: 74px;
 }
-.pc-story-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.pc-story-head .mini-label { margin-bottom: 0; }
-.pc-usage-link {
+.pc-story-card { scroll-margin-top: 74px; }
+
+/* jump chips under "Organized by" — Story · How the money is used */
+.pc-jumplinks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pc-jumplinks button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 4px;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
   font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--primary-strong);
+  color: var(--ink-2);
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-.pc-usage-link:hover { text-decoration: underline; }
+.pc-jumplinks button:hover { border-color: var(--primary); color: var(--primary-strong); }
+/* over the hero photo the chips go translucent-light */
+.pc-hero-content .pc-jumplinks button {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+.pc-hero-content .pc-jumplinks button:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: #fff;
+}
 .pc-usage-group { display: flex; flex-direction: column; gap: 10px; }
 .pc-usage-heading { font-size: var(--fs-15); font-weight: 700; line-height: 1.4; }
 .pc-usage-grid {

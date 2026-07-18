@@ -108,6 +108,8 @@ export default function PublicCampaign() {
     document.getElementById('supporters')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const scrollToUsage = () =>
     document.getElementById('money-use')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scrollToStory = () =>
+    document.getElementById('story')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   const gallery = (campaign.gallery || []).map((g) => g.url)
   const hasCover = gallery.length > 0
@@ -136,6 +138,16 @@ export default function PublicCampaign() {
           )}
           <span className="muted"> · started {shortDate(campaign.created_at)}</span>
         </span>
+      </div>
+      <div className="pc-jumplinks">
+        <button onClick={scrollToStory}>
+          <Icon name="format-quote" size={12} /> Story
+        </button>
+        {(campaign.fund_uses || []).length > 0 && (
+          <button onClick={scrollToUsage}>
+            <Icon name="wallet" size={12} /> How the money is used
+          </button>
+        )}
       </div>
     </>
   )
@@ -176,16 +188,8 @@ export default function PublicCampaign() {
               </div>
             )}
 
-            <section className="card pc-story-card">
-              <div className="pc-story-head">
-                <span className="mini-label">The story</span>
-                {(campaign.fund_uses || []).length > 0 && (
-                  <button className="pc-usage-link" onClick={scrollToUsage}>
-                    <Icon name="wallet" size={12} /> How the money is used
-                    <Icon name="chevron-down" size={12} />
-                  </button>
-                )}
-              </div>
+            <section className="card pc-story-card" id="story">
+              <span className="mini-label">The story</span>
               <MarkdownText text={campaign.description} className="pc-story-text" />
             </section>
 
