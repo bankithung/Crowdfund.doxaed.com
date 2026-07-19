@@ -527,10 +527,6 @@ function FundUsageSection({ fundUses, onCopyLink }) {
            tapping anywhere — the photo included — closes it */
         <div className="lightbox" onClick={() => setLightbox(null)} role="dialog"
              aria-modal="true" aria-label={lightbox.use.heading}>
-          <button className="lightbox-x" aria-label="Close"
-                  onClick={() => setLightbox(null)}>
-            <Icon name="x" size={20} />
-          </button>
           {lightbox.use.images.length > 1 && (
             <button className="lightbox-nav lightbox-prev" aria-label="Previous photo"
                     onClick={(e) => { e.stopPropagation(); move(-1) }}>

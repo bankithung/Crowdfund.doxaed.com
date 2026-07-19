@@ -2202,7 +2202,6 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   font-weight: 600;
 }
 .lightbox figcaption span { color: #9aa3b8; font-weight: 500; }
-.lightbox-x,
 .lightbox-nav {
   position: absolute;
   display: grid;
@@ -2214,9 +2213,7 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   color: #fff;
   transition: background 0.15s ease;
 }
-.lightbox-x:hover,
 .lightbox-nav:hover { background: rgba(255, 255, 255, 0.24); }
-.lightbox-x { top: 16px; right: 16px; }
 .lightbox-nav { top: 50%; transform: translateY(-50%); }
 .lightbox-prev { left: 12px; }
 .lightbox-next { right: 12px; }
