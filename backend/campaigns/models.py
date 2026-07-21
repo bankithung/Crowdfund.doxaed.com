@@ -53,6 +53,11 @@ class Campaign(models.Model):
     qr_payload = models.TextField(blank=True, default="", max_length=1000)
     upi_id = models.CharField(max_length=80, blank=True, default="")
     payee_name = models.CharField(max_length=80, blank=True, default="")
+    # Primary QR extras (additional codes live in CampaignQR). Label + an
+    # optional daily receiving cap so the organizer can track UPI limits.
+    qr_label = models.CharField(max_length=60, blank=True, default="")
+    qr_daily_limit = models.DecimalField(max_digits=12, decimal_places=2,
+                                         null=True, blank=True)
     cover_image = models.ImageField(upload_to=cover_upload_path, blank=True, null=True)
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="active")
@@ -130,6 +135,30 @@ class CampaignImage(models.Model):
         return f"image {self.pk} of campaign {self.campaign_id}"
 
 
+class CampaignQR(models.Model):
+    """Additional payment QR codes beyond the campaign's primary one, so an
+    organizer can spread receipts across several UPI accounts — each has its
+    own daily receiving cap on the bank side."""
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE,
+                                 related_name="extra_qrs")
+    label = models.CharField(max_length=60, blank=True, default="")
+    image = models.ImageField(upload_to=qr_upload_path)
+    qr_payload = models.TextField(blank=True, default="", max_length=1000)
+    upi_id = models.CharField(max_length=80, blank=True, default="")
+    payee_name = models.CharField(max_length=80, blank=True, default="")
+    daily_limit = models.DecimalField(max_digits=12, decimal_places=2,
+                                      null=True, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return f"{self.campaign_id}: {self.label or self.upi_id or self.pk}"
+
+
 class FundUse(models.Model):
     """'How the money is used' groups — a heading with one or more photos,
     shown on the public page under the story."""
@@ -168,6 +197,10 @@ class Donation(models.Model):
 
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE,
                                  related_name="donations")
+    # Which QR the donor paid to (null = the campaign's primary QR), so the
+    # organizer can see per-code daily totals against each code's limit.
+    qr = models.ForeignKey("CampaignQR", on_delete=models.SET_NULL,
+                           null=True, blank=True, related_name="donations")
     public_id = models.CharField(max_length=12, unique=True)
     donor_name = models.CharField(max_length=60)
     donor_email = models.EmailField(blank=True, default="")

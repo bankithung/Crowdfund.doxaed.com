@@ -6,6 +6,7 @@ import csv
 import datetime
 import logging
 import mimetypes
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -21,7 +22,8 @@ from core.api import (BodyError, as_bool, err, methods, ok, paginate,
 
 from .images import (ImageError, decode_qr_payload, delete_file_quiet,
                      process_image)
-from .models import Campaign, CampaignImage, Donation, FundUse, FundUseImage
+from .models import (Campaign, CampaignImage, CampaignQR, Donation, FundUse,
+                     FundUseImage)
 from .serializers import (analytics_dict, campaign_dict, donation_admin_dict,
                           share_url)
 from .validators import (DONATION_MAX, DONATION_MIN, PHONE_RE, TXN_REF_RE,
@@ -150,6 +152,8 @@ def campaign_detail_view(request, pk):
             delete_file_quiet(donation.screenshot)
         for extra in campaign.images.all():
             delete_file_quiet(extra.image)
+        for extra_qr in campaign.extra_qrs.all():
+            delete_file_quiet(extra_qr.image)
         for use in campaign.fund_uses.prefetch_related("images"):
             for img in use.images.all():
                 delete_file_quiet(img.image)
@@ -201,6 +205,16 @@ def campaign_detail_view(request, pk):
                                              max_dim=2000, force="jpeg")
     except ImageError as exc:
         errors["cover_image"] = str(exc)
+
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation", fields=errors)
+
+    if "qr_label" in data:
+        campaign.qr_label = str(data.get("qr_label") or "").strip()[:60]
+    if "qr_daily_limit" in data:
+        campaign.qr_daily_limit, limit_err = _clean_daily_limit(data.get("qr_daily_limit"))
+        if limit_err:
+            errors["qr_daily_limit"] = limit_err
 
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation", fields=errors)
@@ -404,6 +418,120 @@ def fund_use_image_view(request, pk, item_id, image_id):
     return ok({"campaign": campaign_dict(campaign, private=True)})
 
 
+# ------------------------------------------------ payment QR codes
+
+MAX_EXTRA_QRS = 5
+
+
+def _clean_daily_limit(raw):
+    """Empty → None (no cap). Otherwise a positive amount. (value, error)."""
+    text = str(raw or "").strip()
+    if not text:
+        return None, None
+    try:
+        return parse_amount(text, DONATION_MIN, Decimal("100000000"), "daily limit"), None
+    except ValidationError as exc:
+        return None, exc.messages[0]
+
+
+def _resolve_qr(campaign, raw):
+    """Map a submitted qr id to a CampaignQR (or None for the primary code).
+    Returns (qr_or_None, ok). ok is False only when a non-primary id doesn't
+    belong to this campaign."""
+    text = str(raw or "").strip()
+    if not text or text == "0":
+        return None, True
+    try:
+        return campaign.extra_qrs.get(pk=int(text)), True
+    except (ValueError, CampaignQR.DoesNotExist):
+        return None, False
+
+
+@methods("POST")
+@require_login
+def campaign_qr_add_view(request, pk):
+    """Add an extra payment QR code (image required; label / UPI / payee /
+    daily limit optional)."""
+    campaign = get_owned_campaign(request, pk)
+    if campaign.extra_qrs.count() >= MAX_EXTRA_QRS:
+        return err(f"Up to {MAX_EXTRA_QRS} extra codes — remove one to add another.",
+                   400, "validation")
+
+    errors = {}
+    content = None
+    if not request.FILES.get("image"):
+        errors["image"] = "Upload the QR code image."
+    else:
+        try:
+            content, _ = process_image(request.FILES["image"], max_dim=1600, force="png")
+        except ImageError as exc:
+            errors["image"] = str(exc)
+
+    limit, limit_err = _clean_daily_limit(request.POST.get("daily_limit"))
+    if limit_err:
+        errors["daily_limit"] = limit_err
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation", fields=errors)
+
+    last = campaign.extra_qrs.order_by("-position").first()
+    qr = CampaignQR(
+        campaign=campaign,
+        label=str(request.POST.get("label") or "").strip()[:60],
+        upi_id=str(request.POST.get("upi_id") or "").strip()[:80],
+        payee_name=str(request.POST.get("payee_name") or "").strip()[:80],
+        daily_limit=limit,
+        position=(last.position + 1) if last else 1,
+    )
+    qr.qr_payload = decode_qr_payload(content)
+    qr.image.save(content.name, content, save=False)
+    qr.save()
+    log.info("extra qr added id=%s campaign=%s", qr.pk, campaign.pk)
+    return ok({"campaign": campaign_dict(campaign, private=True)}, status=201)
+
+
+@methods("POST", "DELETE")
+@require_login
+def campaign_qr_detail_view(request, pk, qr_id):
+    """POST edits an extra QR (label / UPI / payee / daily limit / replace
+    image); DELETE removes it and its file."""
+    campaign = get_owned_campaign(request, pk)
+    qr = get_object_or_404(CampaignQR, pk=qr_id, campaign=campaign)
+
+    if request.method == "DELETE":
+        delete_file_quiet(qr.image)
+        qr.delete()
+        return ok({"campaign": campaign_dict(campaign, private=True)})
+
+    errors = {}
+    content = None
+    if request.FILES.get("image"):
+        try:
+            content, _ = process_image(request.FILES["image"], max_dim=1600, force="png")
+        except ImageError as exc:
+            errors["image"] = str(exc)
+    if "daily_limit" in request.POST:
+        limit, limit_err = _clean_daily_limit(request.POST.get("daily_limit"))
+        if limit_err:
+            errors["daily_limit"] = limit_err
+        else:
+            qr.daily_limit = limit
+    if errors:
+        return err("Please fix the highlighted fields.", 400, "validation", fields=errors)
+
+    if "label" in request.POST:
+        qr.label = str(request.POST.get("label") or "").strip()[:60]
+    if "upi_id" in request.POST:
+        qr.upi_id = str(request.POST.get("upi_id") or "").strip()[:80]
+    if "payee_name" in request.POST:
+        qr.payee_name = str(request.POST.get("payee_name") or "").strip()[:80]
+    if content:
+        delete_file_quiet(qr.image)
+        qr.qr_payload = decode_qr_payload(content)
+        qr.image.save(content.name, content, save=False)
+    qr.save()
+    return ok({"campaign": campaign_dict(campaign, private=True)})
+
+
 # --------------------------------------------------------------- donations
 
 @methods("GET", "POST")
@@ -468,12 +596,17 @@ def _add_manual_donation(request, campaign):
         except ImageError as exc:
             errors["screenshot"] = str(exc)
 
+    qr, qr_ok = _resolve_qr(campaign, data.get("qr"))
+    if not qr_ok:
+        errors["qr"] = "That QR code is not part of this fundraiser."
+
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation",
                    fields=errors)
 
     donation = Donation(
         campaign=campaign,
+        qr=qr,
         public_id=Donation.generate_public_id(),
         donor_name=cleaned["donor_name"],
         donor_email=cleaned["donor_email"],
@@ -598,6 +731,14 @@ def donation_edit_view(request, pk):
         else:
             donation.donor_email = ""
             fields.append("donor_email")
+
+    if "qr" in data:
+        qr, qr_ok = _resolve_qr(donation.campaign, data.get("qr"))
+        if not qr_ok:
+            errors["qr"] = "That QR code is not part of this fundraiser."
+        else:
+            donation.qr = qr
+            fields.append("qr")
 
     # add or replace the proof screenshot
     screenshot_content = None

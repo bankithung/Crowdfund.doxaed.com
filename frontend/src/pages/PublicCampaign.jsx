@@ -18,15 +18,21 @@ import { PublicShell } from '../components/Shells.jsx'
 import { useToast } from '../ctx/ToastContext.jsx'
 import { dateTime, inr, publicUrl, shortDate, timeAgo } from '../format.js'
 
-/* The organizer's UPI ID — explicit field first, else parsed from the QR payload. */
-function effectiveUpiId(campaign) {
-  if (campaign.upi_id) return campaign.upi_id
-  const match = (campaign.qr_payload || '').match(/[?&]pa=([^&]+)/i)
+/* The UPI ID for a QR — explicit field first, else parsed from its payload. */
+function qrUpiId(qr) {
+  if (!qr) return ''
+  if (qr.upi_id) return qr.upi_id
+  const match = (qr.qr_payload || '').match(/[?&]pa=([^&]+)/i)
   try {
     return match ? decodeURIComponent(match[1]) : ''
   } catch {
     return ''
   }
+}
+
+/* Back-compat helper for the claim modal (still keyed off the campaign). */
+function effectiveUpiId(campaign) {
+  return qrUpiId({ upi_id: campaign.upi_id, qr_payload: campaign.qr_payload })
 }
 
 export default function PublicCampaign() {
@@ -38,6 +44,7 @@ export default function PublicCampaign() {
   const [claimOpen, setClaimOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(!!params.get('ref'))
   const [viewChoice, setViewChoice] = useState(null)   // null → campaign default
+  const [payQrId, setPayQrId] = useState(null)         // selected QR to pay to
 
   const load = useCallback((silent = false) => {
     PublicApi.campaign(slug, { silent })
@@ -123,11 +130,19 @@ export default function PublicCampaign() {
   const stats = campaign.stats
   const goalReached = stats.raised >= stats.goal && stats.goal > 0
   const closed = !campaign.is_open
-  const upiId = effectiveUpiId(campaign)
   const impact = campaign.impact
   const statsView = impact ? (viewChoice || impact.default_view || 'funds') : 'funds'
   const fmtQty = (value) =>
     new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 }).format(value)
+
+  // Payment QR codes — pick the chosen one, defaulting to the first code
+  // that still has room today (so donors are steered off a full code).
+  const qrs = (campaign.qrs && campaign.qrs.length ? campaign.qrs
+    : [{ id: 0, label: '', url: campaign.qr_url, qr_payload: campaign.qr_payload,
+         upi_id: campaign.upi_id, payee_name: campaign.payee_name, is_full: false }])
+  const defaultQr = qrs.find((q) => !q.is_full) || qrs[0]
+  const payQr = qrs.find((q) => q.id === payQrId) || defaultQr
+  const upiId = qrUpiId(payQr)
 
   const copyUpi = async () => {
     try {
@@ -389,41 +404,75 @@ export default function PublicCampaign() {
             {!closed && (
               <div className="card pc-card pc-pay-card" id="pay">
                 <span className="mini-label"><Icon name="qr" size={12} /> Scan to pay</span>
-                  <div className="qr-plate">
-                    <span className="qr-corner tl" aria-hidden="true" />
-                    <span className="qr-corner tr" aria-hidden="true" />
-                    <span className="qr-corner bl" aria-hidden="true" />
-                    <span className="qr-corner br" aria-hidden="true" />
-                    <img src={campaign.qr_url} alt={`Payment QR code for ${campaign.title}`} />
-                  </div>
-                  <p className="pc-qr-payee">
-                    <Icon name="badge-check" size={13} />
-                    Pays <strong>{campaign.payee_name}</strong> directly
-                  </p>
-                  <div className="pc-pay-actions">
-                    <a className="btn btn-outline"
-                       href={campaign.qr_url} download={`${campaign.slug}-payment-qr.png`}>
-                      <Icon name="download" size={15} /> Download QR
-                    </a>
-                    {upiId && (
-                      <button className="btn btn-money-soft" onClick={copyUpi}>
-                        <Icon name="copy" size={15} /> Copy UPI ID
+
+                {qrs.length > 1 && (
+                  <div className="pc-qr-tabs" role="tablist" aria-label="Choose a payment code">
+                    {qrs.map((q, i) => (
+                      <button key={q.id} role="tab" aria-selected={q.id === payQr.id}
+                              className={`pc-qr-tab ${q.id === payQr.id ? 'is-active' : ''} ${q.is_full ? 'is-full' : ''}`}
+                              onClick={() => setPayQrId(q.id)}>
+                        {q.label || `Code ${i + 1}`}
+                        {q.is_full && <span className="pc-qr-tab-full">Full today</span>}
                       </button>
-                    )}
+                    ))}
                   </div>
-                  {upiId && (
-                    <p className="pc-upi-line">
-                      UPI ID: <strong>{upiId}</strong>
-                    </p>
-                  )}
-                  <div className="pc-sep"><span><Icon name="check-circle" size={12} /> After paying</span></div>
-                  <button className="btn btn-primary btn-block btn-lg"
-                          onClick={() => setClaimOpen(true)}>
-                    I've made a payment
-                  </button>
-                  <p className="pc-help muted">
-                    Share your payment screenshot — verified names join the wall.
+                )}
+
+                {payQr.is_full && (
+                  <p className="pc-qr-fullnote">
+                    <Icon name="info" size={13} /> This code has reached today's limit —
+                    please pick another above.
                   </p>
+                )}
+
+                <div className="qr-plate">
+                  <span className="qr-corner tl" aria-hidden="true" />
+                  <span className="qr-corner tr" aria-hidden="true" />
+                  <span className="qr-corner bl" aria-hidden="true" />
+                  <span className="qr-corner br" aria-hidden="true" />
+                  <img src={payQr.url} alt={`Payment QR code${payQr.label ? ` — ${payQr.label}` : ''}`} />
+                </div>
+                <p className="pc-qr-payee">
+                  <Icon name="badge-check" size={13} />
+                  Pays <strong>{payQr.payee_name}</strong> directly
+                </p>
+
+                {payQr.daily_limit != null && (
+                  <div className="pc-qr-daily">
+                    <div className="pc-qr-daily-bar">
+                      <span style={{ width: `${Math.min(100,
+                        (payQr.received_today / payQr.daily_limit) * 100)}%` }} />
+                    </div>
+                    <span className="muted">
+                      {inr(payQr.received_today)} of {inr(payQr.daily_limit)} received today
+                    </span>
+                  </div>
+                )}
+
+                <div className="pc-pay-actions">
+                  <a className="btn btn-outline"
+                     href={payQr.url} download={`${campaign.slug}-payment-qr.png`}>
+                    <Icon name="download" size={15} /> Download QR
+                  </a>
+                  {upiId && (
+                    <button className="btn btn-money-soft" onClick={copyUpi}>
+                      <Icon name="copy" size={15} /> Copy UPI ID
+                    </button>
+                  )}
+                </div>
+                {upiId && (
+                  <p className="pc-upi-line">
+                    UPI ID: <strong>{upiId}</strong>
+                  </p>
+                )}
+                <div className="pc-sep"><span><Icon name="check-circle" size={12} /> After paying</span></div>
+                <button className="btn btn-primary btn-block btn-lg"
+                        onClick={() => setClaimOpen(true)}>
+                  I've made a payment
+                </button>
+                <p className="pc-help muted">
+                  Share your payment screenshot — verified names join the wall.
+                </p>
               </div>
             )}
 
@@ -448,7 +497,7 @@ export default function PublicCampaign() {
         </div>
       )}
 
-      <ClaimModal campaign={campaign} open={claimOpen}
+      <ClaimModal campaign={campaign} qrs={qrs} defaultQrId={payQr.id} open={claimOpen}
                   onClose={() => setClaimOpen(false)} onSubmitted={load} />
       <StatusModal open={statusOpen} initialRef={params.get('ref') || ''}
                    onClose={() => {
@@ -772,12 +821,13 @@ function SupporterModal({ donor, showAmount, onClose }) {
 
 /* ---------------------------------------------------------- claim modal */
 
-function ClaimModal({ campaign, open, onClose, onSubmitted }) {
+function ClaimModal({ campaign, qrs = [], defaultQrId = 0, open, onClose, onSubmitted }) {
   const toast = useToast()
   const [form, setForm] = useState({
     donor_name: '', amount: '', message: '',
     transaction_ref: '', payer_id: '', is_anonymous: false,
   })
+  const [paidQrId, setPaidQrId] = useState(defaultQrId)
   const [screenshot, setScreenshot] = useState(null)
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
@@ -785,6 +835,8 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
   const [scanned, setScanned] = useState(false)
   const [done, setDone] = useState(null)   // {public_id}
   const honeypotRef = useRef(null)
+
+  useEffect(() => { if (open) setPaidQrId(defaultQrId) }, [open, defaultQrId])
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
   const setInput = (key) => (event) => set(key)(event.target.value)
@@ -832,6 +884,7 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
     const body = new FormData()
     for (const [key, value] of Object.entries(form)) body.append(key, value)
     body.set('is_anonymous', form.is_anonymous ? 'true' : 'false')
+    if (qrs.length > 1) body.append('qr', String(paidQrId))
     if (screenshot) body.append('screenshot', screenshot)
     body.append('website', honeypotRef.current?.value || '')
     try {
@@ -877,6 +930,20 @@ function ClaimModal({ campaign, open, onClose, onSubmitted }) {
         </div>
       ) : (
         <form onSubmit={submit} noValidate>
+          {qrs.length > 1 && (
+            <Field label="Which code did you pay to?"
+                   hint="So the organizer can match it to the right account.">
+              <div className="claim-qr-pick">
+                {qrs.map((q, i) => (
+                  <button type="button" key={q.id}
+                          className={`claim-qr-opt ${q.id === paidQrId ? 'is-active' : ''}`}
+                          onClick={() => setPaidQrId(q.id)}>
+                    <Icon name="qr" size={13} /> {q.label || `Code ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
           <section className="modal-section">
             <div className="modal-section-head">
               <span className="msh-num">1</span>

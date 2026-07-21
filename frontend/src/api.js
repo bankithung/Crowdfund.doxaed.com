@@ -81,6 +81,9 @@ export const CampaignApi = {
     api(`/api/donations/${donationId}/edit/`, { method: 'POST', form }),
   addDonation: (campaignId, form) =>
     api(`/api/campaigns/${campaignId}/donations/`, { method: 'POST', form }),
+  addQr: (id, form) => api(`/api/campaigns/${id}/qrs/`, { method: 'POST', form }),
+  updateQr: (id, qrId, form) => api(`/api/campaigns/${id}/qrs/${qrId}/`, { method: 'POST', form }),
+  removeQr: (id, qrId) => api(`/api/campaigns/${id}/qrs/${qrId}/`, { method: 'DELETE' }),
   addImage: (id, form) => api(`/api/campaigns/${id}/images/`, { method: 'POST', form }),
   removeImage: (id, imageId) =>
     api(`/api/campaigns/${id}/images/${imageId}/`, { method: 'DELETE' }),

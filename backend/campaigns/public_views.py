@@ -17,7 +17,7 @@ from core.api import (as_bool, err, methods, ok, paginate, rate_limit)
 from .emails import notify_owner_new_claim
 from .receipts import render_receipt_pdf
 from .images import ImageError, process_image
-from .models import Campaign, Donation
+from .models import Campaign, CampaignQR, Donation
 from .serializers import campaign_dict, donor_public_dict, share_url
 from .validators import clean_donation_fields
 
@@ -144,11 +144,22 @@ def public_donate_view(request, slug):
         errors["transaction_ref"] = ("Add the UPI transaction ID or attach a "
                                      "payment screenshot so the organizer can verify.")
 
+    # which QR the donor paid to (blank/0 → primary); a bad id is ignored
+    # rather than blocking the claim — attribution is a convenience, not proof.
+    qr = None
+    qr_raw = str(request.POST.get("qr") or "").strip()
+    if qr_raw and qr_raw != "0":
+        try:
+            qr = campaign.extra_qrs.get(pk=int(qr_raw))
+        except (ValueError, CampaignQR.DoesNotExist):
+            qr = None
+
     if errors:
         return err("Please fix the highlighted fields.", 400, "validation", fields=errors)
 
     donation = Donation(
         campaign=campaign,
+        qr=qr,
         public_id=Donation.generate_public_id(),
         donor_name=cleaned["donor_name"],
         donor_email=cleaned["donor_email"],

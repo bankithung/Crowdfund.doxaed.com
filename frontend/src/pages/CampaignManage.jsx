@@ -148,6 +148,7 @@ export default function CampaignManage() {
                          setListVersion((v) => v + 1)
                        }} />
           <EditModal donation={editing} campaignSlug={campaign.slug}
+                     campaignQrs={campaign.qrs || []}
                      onClose={() => setEditing(null)}
                      onDone={(stats) => {
                        setEditing(null)
@@ -155,6 +156,7 @@ export default function CampaignManage() {
                        setListVersion((v) => v + 1)
                      }} />
           <AddModal campaignId={campaign.id} campaignSlug={campaign.slug}
+                    campaignQrs={campaign.qrs || []}
                     open={adding} onClose={() => setAdding(false)}
                     onDone={(stats) => {
                       setAdding(false)
@@ -538,6 +540,216 @@ const truncate = (text, n) => (text.length > n ? text.slice(0, n - 1) + '…' : 
 
 /* Headed photo groups shown on the public page under the story — receipts
    of the work itself: buying, transporting, distributing. */
+/* -------------------------------------------------- payment QR codes */
+
+/* Manage all payment QRs — the primary (label + daily cap) plus extras.
+   Each row shows today's confirmed receipts against its daily limit. */
+function PaymentCodesCard({ campaign, onSaved }) {
+  const toast = useToast()
+  const qrs = campaign.qrs || []
+  const [editingId, setEditingId] = useState(undefined)   // qr.id being edited
+  const [draft, setDraft] = useState({})
+  const [adding, setAdding] = useState(false)
+  const [newQr, setNewQr] = useState({ label: '', upi_id: '', daily_limit: '', photo: null })
+  const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState({})
+  const full = qrs.length - 1 >= 5   // 1 primary + up to 5 extras
+
+  const startEdit = (qr) => {
+    setEditingId(qr.id)
+    setDraft({ label: qr.label || '', upi_id: qr.upi_id || '',
+               daily_limit: qr.daily_limit != null ? String(qr.daily_limit) : '' })
+    setErrors({})
+  }
+
+  const saveEdit = async (qr) => {
+    setBusy(true)
+    setErrors({})
+    try {
+      let data
+      if (qr.id === 0) {
+        const body = new FormData()
+        body.append('qr_label', draft.label)
+        body.append('qr_daily_limit', draft.daily_limit)
+        data = await CampaignApi.update(campaign.id, body)
+      } else {
+        const body = new FormData()
+        body.append('label', draft.label)
+        body.append('upi_id', draft.upi_id)
+        body.append('daily_limit', draft.daily_limit)
+        data = await CampaignApi.updateQr(campaign.id, qr.id, body)
+      }
+      onSaved(data.campaign, { silent: true })
+      toast.success('Payment code updated')
+      setEditingId(undefined)
+    } catch (err) {
+      setErrors(err.fields || {})
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (qr) => {
+    setBusy(true)
+    try {
+      const data = await CampaignApi.removeQr(campaign.id, qr.id)
+      onSaved(data.campaign, { silent: true })
+      toast.success('Payment code removed')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addQr = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setErrors({})
+    const body = new FormData()
+    body.append('label', newQr.label)
+    body.append('upi_id', newQr.upi_id)
+    body.append('daily_limit', newQr.daily_limit)
+    if (newQr.photo) body.append('image', newQr.photo)
+    try {
+      const data = await CampaignApi.addQr(campaign.id, body)
+      onSaved(data.campaign, { silent: true })
+      toast.success('Payment code added')
+      setAdding(false)
+      setNewQr({ label: '', upi_id: '', daily_limit: '', photo: null })
+    } catch (err) {
+      setErrors(err.fields || {})
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="section-head">
+        <div>
+          <h2 className="block-title">Payment codes</h2>
+          <p className="section-sub">
+            Add more QR codes to spread payments across accounts, and set a daily
+            limit for each — supporters see today's total and get steered off a full code.
+          </p>
+        </div>
+      </div>
+
+      {qrs.map((qr, i) => (
+        <div className="qr-row" key={qr.id}>
+          <img src={qr.url} alt="" className="qr-row-thumb" />
+          <div className="qr-row-body">
+            {editingId === qr.id ? (
+              <div className="qr-row-edit">
+                <div className="form-row">
+                  <Field label="Label" error={errors.label}>
+                    <input className="input" value={draft.label} maxLength={60}
+                           onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+                           placeholder={qr.id === 0 ? 'e.g. SBI account' : 'e.g. Axis account'} />
+                  </Field>
+                  <Field label="Daily limit (₹)"
+                         error={errors.qr_daily_limit || errors.daily_limit}
+                         hint="Blank = no cap.">
+                    <input className="input" inputMode="decimal" value={draft.daily_limit}
+                           onChange={(e) => setDraft((d) => ({ ...d, daily_limit: e.target.value }))}
+                           placeholder="e.g. 100000" />
+                  </Field>
+                </div>
+                {qr.id !== 0 && (
+                  <Field label="UPI ID" error={errors.upi_id}>
+                    <input className="input" value={draft.upi_id} autoCapitalize="none"
+                           onChange={(e) => setDraft((d) => ({ ...d, upi_id: e.target.value }))}
+                           placeholder="name@bank" />
+                  </Field>
+                )}
+                <div className="qr-row-actions">
+                  <button className="btn btn-primary btn-sm" disabled={busy}
+                          onClick={() => saveEdit(qr)}>
+                    {busy ? <Spinner size={13} /> : 'Save'}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" disabled={busy}
+                          onClick={() => setEditingId(undefined)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="qr-row-head">
+                  <strong>{qr.label || (qr.id === 0 ? 'Primary code' : `Code ${i + 1}`)}</strong>
+                  {qr.is_full && <span className="badge badge-warn">Full today</span>}
+                </div>
+                {qr.upi_id && <span className="cell-sub">{qr.upi_id}</span>}
+                <span className="qr-row-daily">
+                  {qr.daily_limit != null
+                    ? <>{inr(qr.received_today)} of {inr(qr.daily_limit)} received today</>
+                    : <>{inr(qr.received_today)} received today · no daily limit</>}
+                </span>
+              </>
+            )}
+          </div>
+          {editingId !== qr.id && (
+            <div className="qr-row-controls">
+              <button className="icon-btn" onClick={() => startEdit(qr)}
+                      aria-label="Edit payment code">
+                <Icon name="edit" size={14} />
+              </button>
+              {qr.id !== 0 && (
+                <button className="icon-btn" disabled={busy} onClick={() => remove(qr)}
+                        aria-label="Remove payment code">
+                  <Icon name="trash" size={14} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {adding ? (
+        <form onSubmit={addQr} noValidate className="qr-add-form">
+          <ImageInput label="QR code image" square value={newQr.photo}
+                      onChange={(f) => setNewQr((q) => ({ ...q, photo: f }))}
+                      error={errors.image} crop cropAspect={1}
+                      cropTitle="Crop the QR code" />
+          <div className="form-row">
+            <Field label="Label" error={errors.label}>
+              <input className="input" value={newQr.label} maxLength={60}
+                     onChange={(e) => setNewQr((q) => ({ ...q, label: e.target.value }))}
+                     placeholder="e.g. Axis account" />
+            </Field>
+            <Field label="Daily limit (₹)" error={errors.daily_limit} hint="Blank = no cap.">
+              <input className="input" inputMode="decimal" value={newQr.daily_limit}
+                     onChange={(e) => setNewQr((q) => ({ ...q, daily_limit: e.target.value }))}
+                     placeholder="e.g. 50000" />
+            </Field>
+          </div>
+          <Field label="UPI ID (optional)" error={errors.upi_id}>
+            <input className="input" value={newQr.upi_id} autoCapitalize="none"
+                   onChange={(e) => setNewQr((q) => ({ ...q, upi_id: e.target.value }))}
+                   placeholder="name@bank" />
+          </Field>
+          <div className="form-nav">
+            <button type="button" className="btn btn-ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary"
+                    disabled={busy || !newQr.photo}>
+              {busy ? <Spinner size={14} /> : <><Icon name="plus" size={14} /> Add code</>}
+            </button>
+          </div>
+        </form>
+      ) : full ? (
+        <p className="muted qr-add-hint">Up to 5 extra codes — remove one to add another.</p>
+      ) : (
+        <button className="btn btn-outline btn-sm qr-add-btn" onClick={() => setAdding(true)}>
+          <Icon name="plus" size={14} /> Add another QR code
+        </button>
+      )}
+    </div>
+  )
+}
+
 function FundUsageCard({ campaign, onSaved }) {
   const toast = useToast()
   const [heading, setHeading] = useState('')
@@ -1101,6 +1313,8 @@ function SettingsSummary({ campaign, onEdit, onSaved }) {
 
       <GalleryCard campaign={campaign} onSaved={onSaved} />
 
+      <PaymentCodesCard campaign={campaign} onSaved={onSaved} />
+
       <FundUsageCard campaign={campaign} onSaved={onSaved} />
 
       <ImpactSettingsCard key={`impact-${campaign.id}`} campaign={campaign}
@@ -1499,15 +1713,25 @@ function ProofModal({ donation, onClose }) {
 
 /* Every claim detail, editable in one form — shared by Edit and Add. */
 const EMPTY_CLAIM = { donor_name: '', amount: '', message: '', is_anonymous: false,
-                      transaction_ref: '', payer_id: '', donor_email: '' }
+                      transaction_ref: '', payer_id: '', donor_email: '', qr: '0' }
 
-function ClaimFieldset({ form, set, errors }) {
+function ClaimFieldset({ form, set, errors, qrs = [] }) {
   const input = (key, extra = {}) => (
     <input className="input" value={form[key]} {...extra}
            onChange={(e) => set(key)(e.target.value)} />
   )
   return (
     <>
+      {qrs.length > 1 && (
+        <Field label="Paid to which QR code?" error={errors.qr}>
+          <Select value={String(form.qr ?? '0')} onChange={set('qr')}
+                  ariaLabel="Paid to which QR code"
+                  options={qrs.map((q, i) => ({
+                    value: String(q.id),
+                    label: q.label || (q.id === 0 ? 'Primary code' : `Code ${i + 1}`),
+                  }))} />
+        </Field>
+      )}
       <div className="form-row">
         <Field label="Supporter name" required error={errors.donor_name}>
           {input('donor_name', { maxLength: 60 })}
@@ -1541,7 +1765,7 @@ function ClaimFieldset({ form, set, errors }) {
 
 /* Fix a claim after submission — a mistaken anonymous tick, a name typo,
    a wrong amount. Status and proof screenshot stay read-only. */
-function EditModal({ donation, campaignSlug, onClose, onDone }) {
+function EditModal({ donation, campaignSlug, campaignQrs = [], onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_CLAIM)
   const [newShot, setNewShot] = useState(null)   // added/replacement screenshot
@@ -1559,6 +1783,7 @@ function EditModal({ donation, campaignSlug, onClose, onDone }) {
         transaction_ref: donation.transaction_ref || '',
         payer_id: donation.payer_id || '',
         donor_email: donation.donor_email || '',
+        qr: String(donation.qr_id ?? 0),
       })
       setNewShot(null)
       setErrors({})
@@ -1704,7 +1929,7 @@ function EditModal({ donation, campaignSlug, onClose, onDone }) {
           </div>
 
           <form onSubmit={save} noValidate>
-            <ClaimFieldset form={form} set={set} errors={errors} />
+            <ClaimFieldset form={form} set={set} errors={errors} qrs={campaignQrs} />
             <div className="form-nav">
               <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={busy}>
@@ -1720,7 +1945,7 @@ function EditModal({ donation, campaignSlug, onClose, onDone }) {
 
 /* Record a payment that arrived without a claim — cash, a direct transfer,
    a supporter who never submitted proof. Goes on the wall immediately. */
-function AddModal({ campaignId, campaignSlug, open, onClose, onDone }) {
+function AddModal({ campaignId, campaignSlug, campaignQrs = [], open, onClose, onDone }) {
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_CLAIM)
   const [screenshot, setScreenshot] = useState(null)
@@ -1802,7 +2027,7 @@ function AddModal({ campaignId, campaignSlug, open, onClose, onDone }) {
             <Icon name="check-circle" size={13} /> Details filled — please verify.
           </p>
         )}
-        <ClaimFieldset form={form} set={set} errors={errors} />
+        <ClaimFieldset form={form} set={set} errors={errors} qrs={campaignQrs} />
         <div className="form-nav">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn btn-money" disabled={busy}>

@@ -2446,6 +2446,109 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
 .qr-corner.bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 5px; }
 .qr-corner.br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 5px; }
 
+/* manage: payment codes card */
+.qr-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.qr-row:last-of-type { border-bottom: none; }
+.qr-row-thumb {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.qr-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.qr-row-head { display: flex; align-items: center; gap: 8px; }
+.qr-row-head strong { font-size: var(--fs-14); }
+.qr-row-daily { font-size: var(--fs-12); color: var(--ink-2); font-weight: 600; }
+.qr-row-edit { display: flex; flex-direction: column; gap: 10px; }
+.qr-row-actions { display: flex; gap: 8px; }
+.qr-row-controls { display: flex; gap: 2px; flex-shrink: 0; }
+.qr-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.qr-add-btn { margin-top: 14px; }
+.qr-add-hint { margin-top: 14px; }
+
+/* multiple payment QR codes */
+.pc-qr-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.pc-qr-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.pc-qr-tab.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-strong); }
+.pc-qr-tab.is-full { color: var(--muted); text-decoration: line-through; }
+.pc-qr-tab-full {
+  text-decoration: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+.pc-qr-fullnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--warn);
+}
+.pc-qr-daily {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-self: stretch;
+  margin-top: -2px;
+}
+.pc-qr-daily-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.pc-qr-daily-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--money);
+}
+.pc-qr-daily .muted { font-size: var(--fs-12); text-align: center; }
+
+/* claim modal: which code did you pay */
+.claim-qr-pick { display: flex; flex-wrap: wrap; gap: 7px; }
+.claim-qr-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.claim-qr-opt.is-active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-strong); }
+
 .pc-qr-payee {
   display: inline-flex;
   align-items: center;

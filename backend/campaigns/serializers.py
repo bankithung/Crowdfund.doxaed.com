@@ -115,6 +115,45 @@ def impact_settings_dict(campaign):
     return data
 
 
+def campaign_qrs(campaign, *, private):
+    """Unified list of the campaign's payment QR codes — the primary (id 0)
+    plus any extras — each with today's confirmed receipts against its daily
+    cap. Amounts/limits are exposed publicly only when show_amounts is on;
+    'is_full' is always exposed so donors can be routed off a maxed-out code."""
+    today = timezone.localdate()
+    rows = (campaign.donations
+            .filter(status="confirmed", created_at__date=today)
+            .values("qr_id").annotate(total=Sum("amount")))
+    received = {r["qr_id"]: money(r["total"]) for r in rows}
+    reveal = private or campaign.show_amounts
+
+    def entry(qr_id, label, url, payload, upi, payee, limit):
+        got = received.get(qr_id, 0.0)
+        cap = money(limit) if limit is not None else None
+        item = {
+            "id": qr_id or 0,
+            "label": label,
+            "url": url,
+            "qr_payload": payload,
+            "upi_id": upi,
+            "payee_name": payee or campaign.owner.name,
+            "is_full": bool(cap and got >= cap),
+        }
+        if reveal:
+            item["daily_limit"] = cap
+            item["received_today"] = round(got, 2)
+            item["remaining_today"] = round(max(0.0, cap - got), 2) if cap else None
+        return item
+
+    qrs = [entry(None, campaign.qr_label, campaign.qr_code.url if campaign.qr_code else None,
+                 campaign.qr_payload, campaign.upi_id, campaign.payee_name,
+                 campaign.qr_daily_limit)]
+    for extra in campaign.extra_qrs.all():
+        qrs.append(entry(extra.pk, extra.label, extra.image.url, extra.qr_payload,
+                         extra.upi_id, extra.payee_name, extra.daily_limit))
+    return qrs
+
+
 def campaign_dict(campaign, *, private=False):
     data = {
         "id": campaign.pk,
@@ -134,6 +173,7 @@ def campaign_dict(campaign, *, private=False):
         ),
         "upi_id": campaign.upi_id,
         "payee_name": campaign.payee_name or campaign.owner.name,
+        "qrs": campaign_qrs(campaign, private=private),
         "organizer": campaign.owner.name,
         "organizer_verified": campaign.owner.is_verified,
         "status": campaign.status,
@@ -169,6 +209,7 @@ def donation_admin_dict(donation):
         "is_anonymous": donation.is_anonymous,
         "transaction_ref": donation.transaction_ref,
         "payer_id": donation.payer_id,
+        "qr_id": donation.qr_id or 0,
         "has_screenshot": bool(donation.screenshot),
         "proof_url": f"/api/donations/{donation.pk}/proof/" if donation.screenshot else None,
         "status": donation.status,

@@ -345,6 +345,84 @@ class ApiTestCase(TestCase):
         decimals = "Amount paid 2500.00\nTotal ₹500.00"
         self.assertEqual(_pick_amount(decimals, ""), "500.00")
 
+    def test_multiple_qrs_and_daily_limits(self):
+        self.signup()
+        created = self.create_campaign().json()["data"]["campaign"]
+        slug, pk = created["slug"], created["id"]
+
+        # one QR by default (the primary), id 0
+        self.assertEqual(len(created["qrs"]), 1)
+        self.assertEqual(created["qrs"][0]["id"], 0)
+
+        # set a daily limit on the primary, add a second QR with its own limit
+        self.client.post(f"/api/campaigns/{pk}/",
+                         {"qr_label": "SBI account", "qr_daily_limit": "100000"})
+        added = self.client.post(f"/api/campaigns/{pk}/qrs/", {
+            "label": "Axis account", "upi_id": "grace@okaxis",
+            "daily_limit": "50000", "image": png_upload("qr2.png")})
+        self.assertEqual(added.status_code, 201)
+        qrs = added.json()["data"]["campaign"]["qrs"]
+        self.assertEqual(len(qrs), 2)
+        extra_id = qrs[1]["id"]
+        self.assertEqual(qrs[0]["label"], "SBI account")
+        self.assertEqual(qrs[0]["daily_limit"], 100000.0)
+        self.assertEqual(qrs[1]["daily_limit"], 50000.0)
+
+        # public page shows both QRs
+        public = Client().get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]
+        self.assertEqual(len(public["qrs"]), 2)
+
+        # a supporter pays to the extra QR; confirm it
+        anon = Client()
+        anon.post(f"/api/public/campaigns/{slug}/donate/",
+                  {"donor_name": "Vikram Iyer", "amount": "40000",
+                   "transaction_ref": "TXNQR1", "qr": str(extra_id)})
+        d = Donation.objects.get(transaction_ref="TXNQR1")
+        self.assertEqual(d.qr_id, extra_id)
+        self.client.post(f"/api/donations/{d.pk}/review/", {"action": "confirm"},
+                         content_type="application/json")
+
+        # received-today rolls up under that QR; it's now near its cap
+        qrs = self.client.get(f"/api/campaigns/{pk}/").json()["data"]["campaign"]["qrs"]
+        extra = next(q for q in qrs if q["id"] == extra_id)
+        self.assertEqual(extra["received_today"], 40000.0)
+        self.assertEqual(extra["remaining_today"], 10000.0)
+        self.assertFalse(extra["is_full"])
+        self.assertEqual(qrs[0]["received_today"], 0.0)   # primary untouched
+
+        # a second payment tips it over the limit → is_full
+        anon.post(f"/api/public/campaigns/{slug}/donate/",
+                  {"donor_name": "Meera K", "amount": "15000",
+                   "transaction_ref": "TXNQR2", "qr": str(extra_id)})
+        d2 = Donation.objects.get(transaction_ref="TXNQR2")
+        self.client.post(f"/api/donations/{d2.pk}/review/", {"action": "confirm"},
+                         content_type="application/json")
+        extra = next(q for q in self.client.get(f"/api/campaigns/{pk}/")
+                     .json()["data"]["campaign"]["qrs"] if q["id"] == extra_id)
+        self.assertTrue(extra["is_full"])
+
+        # editing a claim can move it to another QR
+        self.client.post(f"/api/donations/{d2.pk}/edit/", {"qr": "0"})
+        self.assertIsNone(Donation.objects.get(pk=d2.pk).qr_id)
+
+        # hidden amounts: public payload drops the numbers but keeps is_full
+        self.client.post(f"/api/campaigns/{pk}/", {"show_amounts": "false"})
+        pub_qr = Client().get(f"/api/public/campaigns/{slug}/").json()["data"]["campaign"]["qrs"]
+        self.assertNotIn("received_today", pub_qr[1])
+        self.assertIn("is_full", pub_qr[1])
+
+        # delete the extra QR; its donations fall back to the primary
+        gone = self.client.delete(f"/api/campaigns/{pk}/qrs/{extra_id}/")
+        self.assertEqual(gone.status_code, 200)
+        self.assertEqual(len(gone.json()["data"]["campaign"]["qrs"]), 1)
+        self.assertIsNone(Donation.objects.get(pk=d.pk).qr_id)
+
+        # bad limit is rejected
+        bad = self.client.post(f"/api/campaigns/{pk}/qrs/",
+                               {"daily_limit": "-5", "image": png_upload("q.png")})
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("daily_limit", bad.json()["error"]["fields"])
+
     def test_fund_uses(self):
         self.signup()
         created = self.create_campaign().json()["data"]["campaign"]
