@@ -765,7 +765,7 @@ function FundUsageCard({ campaign, onSaved }) {
     const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/'))
     if (pickRef.current) pickRef.current.value = ''
     if (!files.length) return
-    setPhotos((prev) => [...prev, ...files].slice(0, 10))
+    setPhotos((prev) => [...prev, ...files.map((file) => ({ file, caption: '' }))].slice(0, 10))
   }
 
   const add = async (event) => {
@@ -774,7 +774,10 @@ function FundUsageCard({ campaign, onSaved }) {
     setErrors({})
     const body = new FormData()
     body.append('heading', heading)
-    for (const photo of photos) body.append('images', photo)
+    for (const p of photos) {
+      body.append('images', p.file)
+      body.append('captions', p.caption)   // paired by order
+    }
     try {
       const data = await CampaignApi.addFundUse(campaign.id, body)
       onSaved(data.campaign, { silent: true })
@@ -816,16 +819,23 @@ function FundUsageCard({ campaign, onSaved }) {
           </Field>
           <div className="field">
             <span className="field-label">Photos (up to 10)</span>
-            <div className="fund-use-picks">
-              {photos.map((file, index) => (
-                <span className="fund-use-pick" key={index}>
-                  <img src={URL.createObjectURL(file)} alt="" />
-                  <button type="button" className="fund-use-pick-x"
-                          aria-label="Remove this photo"
-                          onClick={() => setPhotos((p) => p.filter((_, i) => i !== index))}>
-                    <Icon name="x" size={11} />
-                  </button>
-                </span>
+            <p className="field-hint">Add an optional caption under each photo.</p>
+            <div className="fund-use-newphotos">
+              {photos.map((p, index) => (
+                <div className="fund-use-newphoto" key={index}>
+                  <span className="fund-use-pick">
+                    <img src={URL.createObjectURL(p.file)} alt="" />
+                    <button type="button" className="fund-use-pick-x"
+                            aria-label="Remove this photo"
+                            onClick={() => setPhotos((prev) => prev.filter((_, i) => i !== index))}>
+                      <Icon name="x" size={11} />
+                    </button>
+                  </span>
+                  <input className="input input-sm" value={p.caption} maxLength={160}
+                         placeholder="Caption (optional)"
+                         onChange={(e) => setPhotos((prev) => prev.map((it, i) =>
+                           i === index ? { ...it, caption: e.target.value } : it))} />
+                </div>
               ))}
               {photos.length < 10 && (
                 <button type="button" className="fund-use-pick-add"

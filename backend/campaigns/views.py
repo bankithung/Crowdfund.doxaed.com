@@ -300,25 +300,29 @@ MAX_FUND_USE_IMAGES = 10
 
 def _process_fund_use_uploads(request):
     """Validate + process every uploaded photo ('images' multi-field, with
-    'image' as a single-file fallback). Returns (contents, error)."""
+    'image' as a single-file fallback), pairing each with its optional
+    caption ('captions', same order). Returns (items, error) where each item
+    is (content, caption)."""
     uploads = request.FILES.getlist("images") or (
         [request.FILES["image"]] if request.FILES.get("image") else [])
-    contents = []
-    for upload in uploads:
+    captions = request.POST.getlist("captions")
+    items = []
+    for i, upload in enumerate(uploads):
         try:
             content, _ = process_image(upload, max_dim=2000, force="jpeg")
-            contents.append(content)
         except ImageError as exc:
             return [], str(exc)
-    return contents, None
+        caption = captions[i].strip()[:160] if i < len(captions) else ""
+        items.append((content, caption))
+    return items, None
 
 
-def _append_fund_use_images(item, contents):
+def _append_fund_use_images(item, uploads):
     last = item.images.order_by("-position").first()
     position = (last.position if last else 0)
-    for content in contents:
+    for content, caption in uploads:
         position += 1
-        img = FundUseImage(fund_use=item, position=position)
+        img = FundUseImage(fund_use=item, position=position, caption=caption)
         img.image.save(content.name, content, save=False)
         img.save()
 

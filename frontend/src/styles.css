@@ -2318,6 +2318,16 @@ a.claim-proof-thumb:hover img { opacity: 0.85; }
   gap: 12px;
   padding-top: 14px;
 }
+/* add-new-heading: each picked photo with its own caption field */
+.fund-use-newphotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.fund-use-newphoto { display: flex; flex-direction: column; gap: 6px; width: 120px; }
+.fund-use-newphoto .fund-use-pick { width: 120px; height: 90px; }
+.input-sm { padding: 6px 9px; font-size: var(--fs-12); }
 
 /* funds | impact segmented toggle */
 .pc-view-toggle {

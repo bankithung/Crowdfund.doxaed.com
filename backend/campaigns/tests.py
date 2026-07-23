@@ -488,11 +488,15 @@ class ApiTestCase(TestCase):
         slug, pk = created["slug"], created["id"]
         self.assertEqual(created["fund_uses"], [])
 
-        # create a group with two photos at once
+        # create a group with two photos at once, each with a caption
         added = self.client.post(f"/api/campaigns/{pk}/fund-uses/",
                                  {"heading": "Purchasing cabbage from farmers",
-                                  "images": [png_upload("use1.png"), png_upload("use2.png")]})
+                                  "images": [png_upload("use1.png"), png_upload("use2.png")],
+                                  "captions": ["At the farm gate", ""]})
         self.assertEqual(added.status_code, 201)
+        first_group = added.json()["data"]["campaign"]["fund_uses"][0]
+        self.assertEqual(first_group["images"][0]["caption"], "At the farm gate")
+        self.assertEqual(first_group["images"][1]["caption"], "")
         self.client.post(f"/api/campaigns/{pk}/fund-uses/",
                          {"heading": "Transport to distribution points",
                           "images": [png_upload("use3.png")]})
