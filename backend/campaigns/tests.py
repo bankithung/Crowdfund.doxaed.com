@@ -119,6 +119,65 @@ class ApiTestCase(TestCase):
         me = self.client.get("/api/auth/me/")
         self.assertEqual(me.json()["data"]["user"]["name"], "Asha Rao")
 
+    def test_password_reset_flow(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.core import mail
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        from accounts.models import User
+
+        self.signup()
+        self.client.post("/api/auth/logout/")
+        anon = Client()
+
+        # unknown email still reports success (no user enumeration), no mail
+        mail.outbox.clear()
+        blank = anon.post("/api/auth/password/reset/",
+                          {"email": "nobody@example.com"}, content_type="application/json")
+        self.assertEqual(blank.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+
+        # real email → a reset mail is sent
+        req = anon.post("/api/auth/password/reset/",
+                        {"email": "owner@example.com"}, content_type="application/json")
+        self.assertEqual(req.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("reset", mail.outbox[0].subject.lower())
+
+        user = User.objects.get(email="owner@example.com")
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+
+        # a bad token is rejected
+        bad = anon.post("/api/auth/password/reset/confirm/",
+                        {"uid": uid, "token": "bogus-token", "new_password": "Fresh-pass-99"},
+                        content_type="application/json")
+        self.assertEqual(bad.status_code, 400)
+
+        # weak password is rejected even with a valid token
+        weak = anon.post("/api/auth/password/reset/confirm/",
+                         {"uid": uid, "token": token, "new_password": "123"},
+                         content_type="application/json")
+        self.assertEqual(weak.status_code, 400)
+        self.assertIn("new_password", weak.json()["error"]["fields"])
+
+        # valid reset works, and the new password logs in
+        good = anon.post("/api/auth/password/reset/confirm/",
+                         {"uid": uid, "token": token, "new_password": "Fresh-pass-99"},
+                         content_type="application/json")
+        self.assertEqual(good.status_code, 200)
+        login = anon.post("/api/auth/login/",
+                          {"email": "owner@example.com", "password": "Fresh-pass-99"},
+                          content_type="application/json")
+        self.assertEqual(login.status_code, 200)
+
+        # the token is single-use — password changed, so it no longer validates
+        reuse = anon.post("/api/auth/password/reset/confirm/",
+                          {"uid": uid, "token": token, "new_password": "Another-pass-11"},
+                          content_type="application/json")
+        self.assertEqual(reuse.status_code, 400)
+
     def test_csrf_is_enforced(self):
         strict = Client(enforce_csrf_checks=True)
         response = strict.post("/api/auth/signup/",

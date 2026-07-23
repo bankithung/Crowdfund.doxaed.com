@@ -5,7 +5,9 @@ import { useAuth } from './ctx/AuthContext.jsx'
 import CampaignManage from './pages/CampaignManage.jsx'
 import CampaignNew from './pages/CampaignNew.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import ForgotPassword from './pages/ForgotPassword.jsx'
 import Login from './pages/Login.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 import NotFound from './pages/NotFound.jsx'
 import PublicCampaign from './pages/PublicCampaign.jsx'
 import Signup from './pages/Signup.jsx'
@@ -68,6 +70,8 @@ export default function App() {
       } />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/c/:slug" element={<PublicCampaign />} />
       <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
       <Route path="/dashboard/campaigns/new" element={<Protected><CampaignNew /></Protected>} />

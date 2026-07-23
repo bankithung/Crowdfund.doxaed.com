@@ -1271,6 +1271,18 @@ input[type='date'].input::-webkit-calendar-picker-indicator {
 .auth-sub { font-size: var(--fs-13); color: var(--muted); text-align: center; margin: 5px 0 22px; }
 .auth-switch { text-align: center; font-size: var(--fs-13); color: var(--muted); margin-top: 18px; }
 .auth-switch a { font-weight: 600; }
+.auth-forgot { text-align: right; font-size: var(--fs-12); margin: -8px 0 14px; }
+.auth-forgot a { font-weight: 600; color: var(--primary-strong); }
+.auth-done-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  background: var(--money-soft, var(--primary-soft));
+  color: var(--money-strong);
+}
 
 /* ------------------------------------------------------- dashboard */
 .page-head {

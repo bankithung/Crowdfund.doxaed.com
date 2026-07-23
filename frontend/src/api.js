@@ -64,6 +64,10 @@ export const AuthApi = {
   login: (data) => api('/api/auth/login/', { method: 'POST', body: data }),
   logout: () => api('/api/auth/logout/', { method: 'POST', body: {} }),
   changePassword: (data) => api('/api/auth/password/', { method: 'POST', body: data }),
+  requestPasswordReset: (email) =>
+    api('/api/auth/password/reset/', { method: 'POST', body: { email } }),
+  confirmPasswordReset: (data) =>
+    api('/api/auth/password/reset/confirm/', { method: 'POST', body: data }),
 }
 
 export const CampaignApi = {

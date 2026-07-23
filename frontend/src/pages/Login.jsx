@@ -44,6 +44,9 @@ export default function Login() {
             <input className="input" type="password" value={password} autoComplete="current-password"
                    onChange={(e) => setPassword(e.target.value)} placeholder="Your password" required />
           </Field>
+          <p className="auth-forgot">
+            <Link to="/forgot-password">Forgot your password?</Link>
+          </p>
           <button className="btn btn-primary btn-block" disabled={busy || !email || !password}>
             {busy ? <Spinner size={15} /> : <>Sign in <Icon name="arrow-right" size={15} /></>}
           </button>

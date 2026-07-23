@@ -15,6 +15,8 @@ urlpatterns = [
     path("api/auth/logout/", auth_views.logout_view),
     path("api/auth/me/", auth_views.me_view),
     path("api/auth/password/", auth_views.change_password_view),
+    path("api/auth/password/reset/", auth_views.password_reset_request_view),
+    path("api/auth/password/reset/confirm/", auth_views.password_reset_confirm_view),
 
     # Organizer
     path("api/dashboard/", camp.dashboard_view),
